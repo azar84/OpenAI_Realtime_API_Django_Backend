@@ -41,11 +41,13 @@ git commit -m "Heroku deployment configuration"
 git push heroku main
 ```
 
-### 7. Run Migrations
-```bash
-heroku run python manage.py migrate
-heroku run python manage.py create_default_agent
-```
+### 7. Migrations Run Automatically
+The `release` phase in Procfile automatically runs:
+- `python manage.py migrate --noinput` (applies all migrations)
+- `python manage.py collectstatic --noinput` (collects static files)
+- `python manage.py create_default_agent` (creates default agent if needed)
+
+**No manual migration commands needed!** ✅
 
 ### 8. Configure Twilio
 Update your Twilio webhook URL to:
@@ -55,5 +57,25 @@ https://your-app-name.herokuapp.com/api/webhook/
 
 ## 🔧 One-Command Deploy
 ```bash
-heroku create && heroku addons:create heroku-postgresql:essential-0 && heroku addons:create heroku-redis:essential-0 && git push heroku main && heroku run python manage.py migrate && heroku run python manage.py create_default_agent
+heroku create && heroku addons:create heroku-postgresql:essential-0 && heroku addons:create heroku-redis:essential-0 && git push heroku main
 ```
+
+## 🛡️ Preventing Migration Issues
+
+### Automatic Migration Execution
+The `release` phase in `Procfile` ensures migrations run on every deployment:
+```bash
+release: python manage.py migrate --noinput && python manage.py collectstatic --noinput && python manage.py create_default_agent --name "Default Assistant" || true
+```
+
+### Migration Safety Features
+- **Data migrations included**: Handle existing production data
+- **User assignment**: Automatically assigns agents to admin user
+- **Graceful fallbacks**: Won't fail deployment if admin user exists
+- **Non-interactive**: All commands run without user input
+
+### Best Practices
+1. **Always test migrations locally** before deploying
+2. **Create data migrations** for schema changes affecting existing data
+3. **Use `--noinput` flags** for non-interactive deployment
+4. **Include fallback logic** in migration scripts
