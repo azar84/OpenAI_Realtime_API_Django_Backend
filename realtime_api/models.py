@@ -1,9 +1,96 @@
 from django.db import models
+from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 import json
+
+class UserProfile(models.Model):
+    """Extended user profile with OpenAI API key"""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    openai_api_key = models.CharField(
+        max_length=200, 
+        blank=True, 
+        null=True,
+        help_text="Your OpenAI API key (starts with sk-)"
+    )
+    twilio_account_sid = models.CharField(
+        max_length=100, 
+        blank=True, 
+        null=True,
+        help_text="Your Twilio Account SID (optional, falls back to system default)"
+    )
+    twilio_auth_token = models.CharField(
+        max_length=100, 
+        blank=True, 
+        null=True,
+        help_text="Your Twilio Auth Token (optional, falls back to system default)"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.user.username}'s Profile"
+    
+    def clean(self):
+        """Validate API key format"""
+        if self.openai_api_key and not self.openai_api_key.startswith('sk-'):
+            raise ValidationError({'openai_api_key': 'OpenAI API key must start with "sk-"'})
+    
+    def has_valid_openai_key(self):
+        """Check if user has a valid OpenAI API key"""
+        return bool(self.openai_api_key and self.openai_api_key.startswith('sk-'))
+
+class PhoneNumber(models.Model):
+    """Maps Twilio phone numbers to users and their agents"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='phone_numbers')
+    phone_number = models.CharField(
+        max_length=20, 
+        unique=True,
+        help_text="Twilio phone number (e.g., +1234567890)"
+    )
+    twilio_phone_number_sid = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text="Twilio Phone Number SID (starts with PN)"
+    )
+    agent_config = models.ForeignKey(
+        'AgentConfiguration', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='phone_numbers',
+        help_text="Agent to use for calls to this number (uses user's default if not set)"
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Phone Number"
+        verbose_name_plural = "Phone Numbers"
+    
+    def __str__(self):
+        return f"{self.phone_number} → {self.user.username}"
+    
+    def clean(self):
+        """Validate phone number and SID format"""
+        if not self.phone_number.startswith('+'):
+            raise ValidationError({'phone_number': 'Phone number must start with "+" (e.g., +1234567890)'})
+        
+        if self.twilio_phone_number_sid and not self.twilio_phone_number_sid.startswith('PN'):
+            raise ValidationError({'twilio_phone_number_sid': 'Twilio Phone Number SID must start with "PN"'})
+    
+    def get_agent_config(self):
+        """Get the agent configuration for this phone number"""
+        if self.agent_config:
+            return self.agent_config
+        
+        # Fallback to user's first active agent
+        return self.user.agents.filter(is_active=True).first()
 
 class AgentConfiguration(models.Model):
     """Configuration for AI agents"""
-    name = models.CharField(max_length=100, unique=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='agents')
+    name = models.CharField(max_length=100)
     instructions = models.TextField(
         default="You are a helpful AI assistant. You can respond with both text and audio. Keep responses concise and natural."
     )
@@ -40,7 +127,27 @@ class AgentConfiguration(models.Model):
     is_active = models.BooleanField(default=True)
     
     def __str__(self):
-        return self.name
+        return f"{self.user.username} - {self.name}"
+    
+    class Meta:
+        unique_together = ['user', 'name']  # Each user can have unique agent names
+    
+    def get_user_api_key(self):
+        """Get the user's OpenAI API key from their profile, fallback to system default"""
+        from django.conf import settings
+        
+        # Simple path: User → Profile → API Key
+        try:
+            user_profile = self.user.profile
+            if user_profile.has_valid_openai_key():
+                return user_profile.openai_api_key
+        except UserProfile.DoesNotExist:
+            pass
+        except Exception:
+            pass
+        
+        # Fallback to system default
+        return settings.OPENAI_API_KEY
     
     def to_openai_config(self):
         """Convert to OpenAI session configuration format"""
@@ -75,9 +182,11 @@ class CallSession(models.Model):
     twilio_call_sid = models.CharField(max_length=100, null=True, blank=True)
     twilio_stream_sid = models.CharField(max_length=100, null=True, blank=True)
     agent_config = models.ForeignKey(AgentConfiguration, on_delete=models.CASCADE, null=True, blank=True)
+    phone_number = models.ForeignKey(PhoneNumber, on_delete=models.SET_NULL, null=True, blank=True, related_name='call_sessions')
     
     # Call metadata
     caller_number = models.CharField(max_length=20, null=True, blank=True)
+    called_number = models.CharField(max_length=20, null=True, blank=True)
     call_start_time = models.DateTimeField(auto_now_add=True)
     call_end_time = models.DateTimeField(null=True, blank=True)
     call_duration_seconds = models.IntegerField(null=True, blank=True)
@@ -112,3 +221,21 @@ class CallSession(models.Model):
         
         self.conversation_log.append(log_entry)
         self.save(update_fields=['conversation_log'])
+
+# Signal to automatically create UserProfile when User is created
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+@receiver(post_save, sender=User)
+def create_user_profile(sender, instance, created, **kwargs):
+    """Create UserProfile when a new User is created"""
+    if created:
+        UserProfile.objects.create(user=instance)
+
+@receiver(post_save, sender=User)
+def save_user_profile(sender, instance, **kwargs):
+    """Save UserProfile when User is saved"""
+    if hasattr(instance, 'profile'):
+        instance.profile.save()
+    else:
+        UserProfile.objects.create(user=instance)

@@ -10,34 +10,48 @@ logger = logging.getLogger(__name__)
 
 @csrf_exempt
 def twilio_webhook(request):
-    """Handle incoming Twilio calls and connect to WebSocket"""
+    """Handle incoming Twilio calls and route to appropriate user's agent"""
     try:
-        # Generate unique session ID for this call
-        session_id = str(uuid.uuid4())
-        
-        # Get call information from Twilio
+        # Get basic call information from Twilio FIRST
         call_sid = request.POST.get('CallSid', '')
         caller_number = request.POST.get('From', '')
         called_number = request.POST.get('To', '')
         
-        # Build WebSocket URL dynamically
-        # In production, replace with your actual domain
+        # Generate unique session ID for this call
+        session_id = str(uuid.uuid4())
+        
+        logger.info(f"Incoming call - CallSid: {call_sid}, From: {caller_number}, To: {called_number}")
+        
+        # Build WebSocket URL immediately (before any database lookups)
         host = request.get_host()
-        # Use WSS for ngrok (HTTPS) and WS for local development
         is_secure = request.is_secure() or 'ngrok' in host
         protocol = 'wss' if is_secure else 'ws'
         websocket_url = f"{protocol}://{host}/ws/realtime/{session_id}/"
         
-        # Create TwiML response that connects to our WebSocket
+        # IMMEDIATELY return TwiML with "Connected" message
+        # Do routing logic asynchronously in the WebSocket consumer
         twiml_response = f'''<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say voice="alice">Hello! You're now connected to an AI assistant. Please speak after the tone.</Say>
+    <Say voice="alice">Connected</Say>
     <Connect>
         <Stream url="{websocket_url}" />
     </Connect>
 </Response>'''
         
-        logger.info(f"New call connected - CallSid: {call_sid}, From: {caller_number}, Session: {session_id}")
+        logger.info(f"Sending immediate TwiML response for session: {session_id}")
+        
+        # Store basic call session info (routing will be done in consumer)
+        try:
+            from .models import CallSession
+            CallSession.objects.create(
+                session_id=session_id,
+                twilio_call_sid=call_sid,
+                caller_number=caller_number,
+                called_number=called_number,
+                status='started'
+            )
+        except Exception as e:
+            logger.error(f"Error creating call session: {e}")
         
         return HttpResponse(twiml_response, content_type='text/xml')
         

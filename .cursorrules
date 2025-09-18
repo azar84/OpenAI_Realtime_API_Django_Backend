@@ -1,0 +1,145 @@
+# OpenAI Realtime API Django Backend - Cursor Rules
+
+## 🚀 Server Requirements
+
+### CRITICAL: Always use ASGI server for WebSocket support
+- ❌ NEVER use: `python manage.py runserver` (WSGI only - no WebSocket support)
+- ✅ ALWAYS use: `daphne -b 0.0.0.0 -p 8000 realtime_backend.asgi:application`
+- ✅ Alternative: `uvicorn realtime_backend.asgi:application --host 0.0.0.0 --port 8000`
+
+### Why ASGI is Required:
+- Django Channels WebSocket consumers require ASGI
+- Twilio Stream API needs WebSocket connections
+- OpenAI Realtime API uses WebSockets
+- Regular Django runserver only supports HTTP/WSGI
+
+## 🔧 Development Setup
+
+### 1. Start ASGI Server
+```bash
+daphne -b 0.0.0.0 -p 8000 realtime_backend.asgi:application
+```
+
+### 2. Start ngrok (for Twilio webhooks)
+```bash
+ngrok http 8000
+```
+
+### 3. Configure Twilio Webhook
+Use ngrok HTTPS URL: `https://[random].ngrok-free.app/api/webhook/`
+
+## 📱 Phone Number Routing
+
+### Key Concept: Use Twilio Phone Number SID (not phone number)
+- Twilio sends `ToSid` parameter in webhook
+- Lookup `PhoneNumber` model by `twilio_phone_number_sid` field
+- Route to user's specific agent based on phone number ownership
+
+### Routing Flow:
+1. Twilio call → Webhook with `ToSid`
+2. Find `PhoneNumber` by `twilio_phone_number_sid`
+3. Get user's `AgentConfiguration`
+4. Use user's `openai_api_key` (or fallback to system default)
+5. Generate WebSocket URL with `phone_id` and `agent_id`
+
+## 🏗️ Architecture
+
+### Models:
+- `UserProfile`: Stores user's OpenAI API key and Twilio credentials
+- `PhoneNumber`: Maps Twilio Phone Number SID to user and agent
+- `AgentConfiguration`: AI agent settings per user
+- `CallSession`: Tracks individual call sessions
+
+### WebSocket Flow:
+```
+Phone Call → Twilio → Webhook → WebSocket Consumer → Session Manager → OpenAI API
+```
+
+### Multi-User Isolation:
+- Each user has their own agents and phone numbers
+- Users only see their own data in admin
+- Each call uses the phone number owner's API key
+
+## 🔐 Security & Permissions
+
+### Admin Interface:
+- Superusers: See all data
+- Regular users: Only see their own agents, phone numbers, and call sessions
+- Auto-assignment: New items automatically assigned to current user
+
+### API Key Management:
+- User-specific OpenAI API keys in `UserProfile`
+- Fallback to system `OPENAI_API_KEY` if user key not set
+- Validation: OpenAI keys must start with `sk-`
+
+## 🧪 Testing
+
+### Test Phone Routing:
+```bash
+curl -X POST https://[ngrok-url]/api/webhook/ \
+  -d "CallSid=CA123..." \
+  -d "From=+1555..." \
+  -d "To=+1306..." \
+  -d "ToSid=PN123..." \
+  -H "Content-Type: application/x-www-form-urlencoded"
+```
+
+### Verify WebSocket URLs:
+Should generate: `wss://[ngrok-url]/ws/realtime/[session-id]/?phone_id=X&agent_id=Y`
+
+## 🚨 Common Issues
+
+### 1. "Call not connected to agent"
+- Check: Using ASGI server (daphne/uvicorn)?
+- Check: ngrok tunnel active?
+- Check: Phone Number SID correctly configured?
+
+### 2. "No WebSocket support"
+- Solution: Use daphne or uvicorn, not `manage.py runserver`
+
+### 3. "Phone number not found"
+- Check: `ToSid` parameter in webhook
+- Check: `twilio_phone_number_sid` in PhoneNumber model matches
+
+## 📦 Dependencies
+
+### Required for WebSocket support:
+- `channels>=4.0.0`
+- `channels-redis>=4.1.0` (or use InMemoryChannelLayer)
+- `daphne>=4.0.0`
+- `websockets>=11.0.3`
+
+### Production Deployment:
+```bash
+# Procfile
+web: daphne realtime_backend.asgi:application --port $PORT --bind 0.0.0.0 -v2
+```
+
+## 🎯 Key Files
+
+### ASGI Configuration:
+- `realtime_backend/asgi.py` - ASGI application setup
+- `realtime_api/routing.py` - WebSocket URL routing
+- `realtime_api/consumers.py` - WebSocket consumer logic
+
+### Core Logic:
+- `realtime_api/views.py` - Twilio webhook handler
+- `realtime_api/session_manager.py` - OpenAI Realtime API integration
+- `realtime_api/models.py` - Database models
+
+## 💡 Best Practices
+
+1. **Always use ASGI servers** for this project
+2. **Test webhook routing** before production deployment
+3. **Validate Twilio SIDs** in PhoneNumber model
+4. **Use user isolation** in admin interfaces
+5. **Fallback gracefully** when user API keys missing
+6. **Log webhook requests** for debugging
+
+## 🔄 Development Workflow
+
+1. Start ASGI server: `daphne -b 0.0.0.0 -p 8000 realtime_backend.asgi:application`
+2. Start ngrok: `ngrok http 8000`
+3. Configure Twilio webhook with ngrok HTTPS URL
+4. Add phone numbers in admin with correct Twilio SIDs
+5. Test routing with curl or real phone calls

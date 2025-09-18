@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class RealtimeSession:
     """Manages a single realtime session with OpenAI and Twilio"""
     
-    def __init__(self, session_id: str):
+    def __init__(self, session_id: str, agent_config=None):
         self.session_id = session_id
         self.twilio_conn = None  # WebSocket connection from Twilio
         self.model_conn = None   # WebSocket connection to OpenAI
@@ -25,7 +25,41 @@ class RealtimeSession:
         self.last_assistant_item: Optional[str] = None
         self.response_start_timestamp: Optional[float] = None
         self.latest_media_timestamp: Optional[float] = None
-        self.openai_api_key = settings.OPENAI_API_KEY
+        self.agent_config = agent_config
+        
+        # DEBUG: Log what agent config we received
+        if agent_config:
+            try:
+                logger.info(f"🤖 Session {session_id} initialized with agent: {agent_config.name} (ID: {agent_config.id})")
+            except:
+                logger.info(f"🤖 Session {session_id} initialized with agent config")
+        else:
+            logger.warning(f"🤖 Session {session_id} initialized with NO agent config")
+            
+        self.openai_api_key = self._get_openai_api_key()
+    
+    def _get_openai_api_key(self):
+        """Get OpenAI API key from agent's user profile or fallback to system default"""
+        try:
+            if self.agent_config:
+                # Simple path: Agent → User → Profile → API Key
+                api_key = self.agent_config.get_user_api_key()
+                logger.info(f"🔑 Retrieved API key for agent {self.agent_config.name}: {api_key[:20]}...")
+                return api_key
+            else:
+                logger.warning("🔑 No agent_config available, using system default")
+        except Exception as e:
+            logger.warning(f"🔑 Error getting user API key, using system default: {e}")
+        
+        logger.warning(f"🔑 Using system API key: {settings.OPENAI_API_KEY[:20]}...")
+        return settings.OPENAI_API_KEY
+    
+    def set_agent_config(self, agent_config):
+        """Set the agent configuration and update API key"""
+        self.agent_config = agent_config
+        self.openai_api_key = self._get_openai_api_key()
+        if agent_config:
+            self.saved_config = agent_config.to_openai_config()
         
     def set_twilio_connection(self, consumer):
         """Set the Django Channels consumer as Twilio connection"""
@@ -100,6 +134,11 @@ class RealtimeSession:
             
             model_url = f"{settings.OPENAI_REALTIME_URL}?model={settings.OPENAI_REALTIME_MODEL}"
             
+            # DEBUG: Log connection details
+            logger.info(f"Connecting to OpenAI with key: {self.openai_api_key[:20]}...")
+            logger.info(f"URL: {model_url}")
+            logger.info(f"Headers: {headers}")
+            
             import ssl
             # Create SSL context for production
             ssl_context = ssl.create_default_context()
@@ -124,31 +163,41 @@ class RealtimeSession:
     
     async def configure_session(self):
         """Configure the OpenAI session"""
-        config = self.saved_config or {}
-        
-        session_config = {
-            "type": "session.update",
-            "session": {
-                "modalities": ["text", "audio"],
-                "turn_detection": {"type": "server_vad"},
-                "voice": "alloy",
-                "input_audio_transcription": {"model": "whisper-1"},
-                "input_audio_format": "g711_ulaw",  # Twilio format
-                "output_audio_format": "g711_ulaw", # Twilio format
-                **config
+        try:
+            # Use agent configuration if available, otherwise use defaults
+            if self.agent_config and self.saved_config:
+                config = self.saved_config
+            else:
+                config = {
+                    "modalities": ["text", "audio"],
+                    "turn_detection": {"type": "server_vad"},
+                    "voice": "alloy",
+                    "input_audio_transcription": {"model": "whisper-1"},
+                    "input_audio_format": "g711_ulaw",  # Twilio format
+                    "output_audio_format": "g711_ulaw", # Twilio format
+                }
+            
+            session_config = {
+                "type": "session.update",
+                "session": config
             }
-        }
-        
-        await self.send_to_model(session_config)
-        logger.info("OpenAI session configured")
+            
+            await self.send_to_model(session_config)
+            logger.info("OpenAI session configured successfully")
+            
+        except Exception as e:
+            logger.error(f"Error configuring OpenAI session: {e}")
+            raise
     
     async def listen_to_model(self):
         """Listen for responses from OpenAI"""
         try:
             async for message in self.model_conn:
                 await self.handle_model_message(message)
-        except websockets.exceptions.ConnectionClosed:
-            logger.info("OpenAI connection closed")
+        except websockets.exceptions.ConnectionClosed as e:
+            logger.warning(f"OpenAI connection closed: {e}")
+        except websockets.exceptions.ConnectionClosedError as e:
+            logger.error(f"OpenAI connection closed with error: {e}")
         except Exception as e:
             logger.error(f"Error listening to model: {e}")
         finally:
@@ -354,10 +403,13 @@ class SessionManager:
     def __init__(self):
         self.sessions: Dict[str, RealtimeSession] = {}
     
-    def get_session(self, session_id: str) -> RealtimeSession:
+    def get_session(self, session_id: str, agent_config=None) -> RealtimeSession:
         """Get or create a session"""
         if session_id not in self.sessions:
-            self.sessions[session_id] = RealtimeSession(session_id)
+            self.sessions[session_id] = RealtimeSession(session_id, agent_config)
+        elif agent_config and not self.sessions[session_id].agent_config:
+            # Set agent config if not already set
+            self.sessions[session_id].set_agent_config(agent_config)
         return self.sessions[session_id]
     
     def remove_session(self, session_id: str):
