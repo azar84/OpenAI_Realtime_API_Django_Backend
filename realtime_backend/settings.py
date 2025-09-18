@@ -78,33 +78,28 @@ WSGI_APPLICATION = 'realtime_backend.wsgi.application'
 ASGI_APPLICATION = 'realtime_backend.asgi.application'
 
 # Channels configuration
-# Redis configuration for Heroku
-redis_url = os.getenv('REDIS_TLS_URL') or os.getenv('REDIS_URL')
+# Channel layers configuration
+# For now, use InMemory on Heroku due to Redis SSL certificate issues
+# This works fine for single dyno deployment and moderate traffic
 
-if redis_url:
-    # Configure Redis with SSL bypass using connection_kwargs
-    import ssl
-    CHANNEL_LAYERS = {
-        'default': {
-            'BACKEND': 'channels_redis.core.RedisChannelLayer',
-            'CONFIG': {
-                "hosts": [redis_url],
-                "capacity": 1500,
-                "expiry": 10,
-                "connection_kwargs": {
-                    "ssl_cert_reqs": ssl.CERT_NONE,
-                    "ssl_check_hostname": False,
-                },
-            },
-        },
-    }
-else:
-    # Fallback to InMemory for local development
-    CHANNEL_LAYERS = {
-        'default': {
-            'BACKEND': 'channels.layers.InMemoryChannelLayer',
-        },
-    }
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}
+
+# Redis configuration (commented out due to SSL issues)
+# When Redis SSL is resolved, uncomment this:
+# redis_url = os.getenv('REDIS_TLS_URL') or os.getenv('REDIS_URL')
+# if redis_url:
+#     CHANNEL_LAYERS = {
+#         'default': {
+#             'BACKEND': 'channels_redis.core.RedisChannelLayer',
+#             'CONFIG': {
+#                 "hosts": [redis_url],
+#             },
+#         },
+#     }
 
 
 # Database
