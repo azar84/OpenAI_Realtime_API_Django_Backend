@@ -1,65 +1,120 @@
-2025-09-18T04:16:53.128468+00:00 heroku[web.1]: Process exited with status 0
-2025-09-18T04:16:55.589013+00:00 heroku[web.1]: Starting process with command `daphne realtime_backend.asgi:application --port 58568 --bind 0.0.0.0`
-2025-09-18T04:16:56.249994+00:00 app[web.1]: Python buildpack: Detected 512 MB available memory and 8 CPU cores.
-2025-09-18T04:16:56.250083+00:00 app[web.1]: Python buildpack: Defaulting WEB_CONCURRENCY to 2 based on the available memory.
-2025-09-18T04:16:57.193974+00:00 app[web.1]: 2025-09-18 04:16:57,193 INFO     Starting server at tcp:port=58568:interface=0.0.0.0
-2025-09-18T04:16:57.194237+00:00 app[web.1]: 2025-09-18 04:16:57,194 INFO     HTTP/2 support not enabled (install the http2 and tls Twisted extras)
-2025-09-18T04:16:57.194366+00:00 app[web.1]: 2025-09-18 04:16:57,194 INFO     Configuring endpoint tcp:port=58568:interface=0.0.0.0
-2025-09-18T04:16:57.194837+00:00 app[web.1]: 2025-09-18 04:16:57,194 INFO     Listening on TCP address 0.0.0.0:58568
-2025-09-18T04:16:57.335826+00:00 heroku[web.1]: State changed from starting to up
-2025-09-18T04:16:59.000000+00:00 app[api]: Build succeeded
-2025-09-18T04:17:16.699942+00:00 heroku[router]: at=info method=POST path="/api/webhook/" host=openai-realtime-django-backend-f60c0c72a02b.herokuapp.com request_id=ec884676-bce9-b89e-ff01-65f5fc4f1972 fwd="3.80.219.55" dyno=web.1 connect=0ms service=15ms status=200 bytes=335 protocol=http1.1 tls=true tls_version=unknown
-2025-09-18T04:17:16.698260+00:00 app[web.1]: 2025-09-18 04:17:16,698 INFO     New call connected - CallSid: CA69a18bcb72457da31f40788e59a895f8, From: +13062618582, Session: 394f97db-d394-472b-9bf4-c31a537862cc
-2025-09-18T04:17:16.699677+00:00 app[web.1]: 10.1.1.172:31462 - - [18/Sep/2025:04:17:16] "POST /api/webhook/" 200 335
-2025-09-18T04:17:23.253726+00:00 app[web.1]: 10.1.22.213:10790 - - [18/Sep/2025:04:17:23] "WSCONNECTING /ws/realtime/394f97db-d394-472b-9bf4-c31a537862cc/" - -
-2025-09-18T04:17:23.393494+00:00 app[web.1]: 10.1.22.213:10790 - - [18/Sep/2025:04:17:23] "WSCONNECT /ws/realtime/394f97db-d394-472b-9bf4-c31a537862cc/" - -
-2025-09-18T04:17:23.393574+00:00 app[web.1]: 2025-09-18 04:17:23,393 INFO     WebSocket connected for session: 394f97db-d394-472b-9bf4-c31a537862cc
-2025-09-18T04:17:23.437693+00:00 app[web.1]: 2025-09-18 04:17:23,437 INFO     Twilio connection established for session 394f97db-d394-472b-9bf4-c31a537862cc
-2025-09-18T04:17:23.437717+00:00 app[web.1]: 2025-09-18 04:17:23,437 INFO     Session initialized, ready for Twilio messages
-2025-09-18T04:17:24.215056+00:00 app[web.1]: 2025-09-18 04:17:24,213 ERROR    Exception inside application: Error 1 connecting to ec2-3-219-4-191.compute-1.amazonaws.com:22340. 1.
-2025-09-18T04:17:24.215076+00:00 app[web.1]: Traceback (most recent call last):
-2025-09-18T04:17:24.215077+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/site-packages/redis/asyncio/connection.py", line 243, in connect
-2025-09-18T04:17:24.215077+00:00 app[web.1]:     await self.retry.call_with_retry(
-2025-09-18T04:17:24.215077+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/site-packages/redis/asyncio/retry.py", line 59, in call_with_retry
-2025-09-18T04:17:24.215078+00:00 app[web.1]:     return await do()
-2025-09-18T04:17:24.215078+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/site-packages/redis/asyncio/connection.py", line 650, in _connect
-2025-09-18T04:17:24.215079+00:00 app[web.1]:     reader, writer = await asyncio.open_connection(
-2025-09-18T04:17:24.215079+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/asyncio/streams.py", line 48, in open_connection
-2025-09-18T04:17:24.215080+00:00 app[web.1]:     transport, _ = await loop.create_connection(
-2025-09-18T04:17:24.215080+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/asyncio/base_events.py", line 1103, in create_connection
-2025-09-18T04:17:24.215081+00:00 app[web.1]:     transport, protocol = await self._create_connection_transport(
-2025-09-18T04:17:24.215081+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/asyncio/base_events.py", line 1133, in _create_connection_transport
-2025-09-18T04:17:24.215081+00:00 app[web.1]:     await waiter
-2025-09-18T04:17:24.215082+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/asyncio/sslproto.py", line 534, in data_received
-2025-09-18T04:17:24.215082+00:00 app[web.1]:     ssldata, appdata = self._sslpipe.feed_ssldata(data)
-2025-09-18T04:17:24.215083+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/asyncio/sslproto.py", line 188, in feed_ssldata
-2025-09-18T04:17:24.215083+00:00 app[web.1]:     self._sslobj.do_handshake()
-2025-09-18T04:17:24.215083+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/ssl.py", line 975, in do_handshake
-2025-09-18T04:17:24.215084+00:00 app[web.1]:     self._sslobj.do_handshake()
-2025-09-18T04:17:24.215086+00:00 app[web.1]: ssl.SSLCertVerificationError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate in certificate chain (_ssl.c:1007)
-2025-09-18T04:17:24.215087+00:00 app[web.1]: 
-2025-09-18T04:17:24.215087+00:00 app[web.1]: During handling of the above exception, another exception occurred:
-2025-09-18T04:17:24.215098+00:00 app[web.1]: 
-2025-09-18T04:17:24.215098+00:00 app[web.1]: Traceback (most recent call last):
-2025-09-18T04:17:24.215099+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/site-packages/channels/routing.py", line 62, in __call__
-2025-09-18T04:17:24.215099+00:00 app[web.1]:     return await application(scope, receive, send)
-2025-09-18T04:17:24.215099+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/site-packages/channels/sessions.py", line 47, in __call__
-2025-09-18T04:17:24.215100+00:00 app[web.1]:     return await self.inner(dict(scope, cookies=cookies), receive, send)
-2025-09-18T04:17:24.215100+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/site-packages/channels/sessions.py", line 263, in __call__
-2025-09-18T04:17:24.215100+00:00 app[web.1]:     return await self.inner(wrapper.scope, receive, wrapper.send)
-2025-09-18T04:17:24.215100+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/site-packages/channels/auth.py", line 185, in __call__
-2025-09-18T04:17:24.215101+00:00 app[web.1]:     return await super().__call__(scope, receive, send)
-2025-09-18T04:17:24.215101+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/site-packages/channels/middleware.py", line 24, in __call__
-2025-09-18T04:17:24.215101+00:00 app[web.1]:     return await self.inner(scope, receive, send)
-2025-09-18T04:17:24.215101+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/site-packages/channels/routing.py", line 116, in __call__
-2025-09-18T04:17:24.215101+00:00 app[web.1]:     return await application(
-2025-09-18T04:17:24.215102+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/site-packages/channels/consumer.py", line 94, in app
-2025-09-18T04:17:24.215102+00:00 app[web.1]:     return await consumer(scope, receive, send)
-2025-09-18T04:17:24.215102+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/site-packages/channels/consumer.py", line 58, in __call__
-2025-09-18T04:17:24.215102+00:00 app[web.1]:     await await_many_dispatch(
-2025-09-18T04:17:24.215102+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/site-packages/channels/utils.py", line 57, in await_many_dispatch
-2025-09-18T04:17:24.215103+00:00 app[web.1]:     await task
-2025-09-18T04:17:24.215103+00:00 app[web.1]: redis.exceptions.ConnectionError: Error 1 connecting to ec2-3-219-4-191.compute-1.amazonaws.com:22340. 1.
-2025-09-18T04:17:25.001886+00:00 heroku[router]: at=info method=GET path="/ws/realtime/394f97db-d394-472b-9bf4-c31a537862cc/" host=openai-realtime-django-backend-f60c0c72a02b.herokuapp.com request_id=934f4c9e-8f14-84aa-6586-1b44bcb99ac8 fwd="52.90.216.105" dyno=web.1 connect=0ms service=1751ms status=101 bytes=0 protocol=http1.1 tls=true tls_version=unknown
-2025-09-18T04:17:25.001817+00:00 app[web.1]: 10.1.22.213:10790 - - [18/Sep/2025:04:17:25] "WSDISCONNECT /ws/realtime/394f97db-d394-472b-9bf4-c31a537862cc/" - -
-2025-09-18T04:16:58.000000+00:00 app[heroku-redis]: source=REDIS addon=redis-deep-24044 sample#active-connections=1 sample#max-connections=18 sample#connection-percentage-used=0.05556 sample#load-avg-1m=0.845 sample#load-avg-5m=0.87 sample#load-avg-15m=0.875 sample#read-iops=0 sample#write-iops=0 sample#max-iops=3000 sample#iops-percentage-used=0.00000 sample#memory-total=16167796kB sample#memory-free=9663008kB sample#memory-percentage-used=0.40233 sample#memory-cached=1780380kB sample#memory-redis=4827432bytes sample#hit-rate=1 sample#evicted-keys=0
+2025-09-18T04:28:16.630438+00:00 app[web.1]: Python buildpack: Detected 512 MB available memory and 8 CPU cores.
+2025-09-18T04:28:16.630521+00:00 app[web.1]: Python buildpack: Defaulting WEB_CONCURRENCY to 2 based on the available memory.
+2025-09-18T04:28:17.583613+00:00 app[web.1]: 2025-09-18 04:28:17,583 INFO     Starting server at tcp:port=32073:interface=0.0.0.0
+2025-09-18T04:28:17.583894+00:00 app[web.1]: 2025-09-18 04:28:17,583 INFO     HTTP/2 support not enabled (install the http2 and tls Twisted extras)
+2025-09-18T04:28:17.584026+00:00 app[web.1]: 2025-09-18 04:28:17,583 INFO     Configuring endpoint tcp:port=32073:interface=0.0.0.0
+2025-09-18T04:28:17.584421+00:00 app[web.1]: 2025-09-18 04:28:17,584 INFO     HTTPFactory starting on 32073
+2025-09-18T04:28:17.584492+00:00 app[web.1]: 2025-09-18 04:28:17,584 INFO     Starting factory <daphne.http_protocol.HTTPFactory object at 0x7f63851cf970>
+2025-09-18T04:28:17.584650+00:00 app[web.1]: 2025-09-18 04:28:17,584 INFO     Listening on TCP address 0.0.0.0:32073
+2025-09-18T04:28:17.766359+00:00 heroku[web.1]: State changed from starting to up
+2025-09-18T04:28:19.000000+00:00 app[api]: Build succeeded
+2025-09-18T04:28:36.195937+00:00 heroku[router]: at=info method=POST path="/api/webhook/" host=openai-realtime-django-backend-f60c0c72a02b.herokuapp.com request_id=136f7aeb-309d-1e9e-5b67-ab0e160caaf0 fwd="13.217.85.236" dyno=web.1 connect=0ms service=15ms status=200 bytes=335 protocol=http1.1 tls=true tls_version=unknown
+2025-09-18T04:28:36.182436+00:00 app[web.1]: 2025-09-18 04:28:36,182 DEBUG    HTTP b'POST' request for ['10.1.25.72', 36784]
+2025-09-18T04:28:36.193912+00:00 app[web.1]: 2025-09-18 04:28:36,193 INFO     New call connected - CallSid: CA01582e064df2d0a97e59b88d3ddb4f72, From: +13062618582, Session: 6e010687-7e3a-4db7-9be5-5e6a369f998c
+2025-09-18T04:28:36.195124+00:00 app[web.1]: 2025-09-18 04:28:36,195 DEBUG    HTTP 200 response started for ['10.1.25.72', 36784]
+2025-09-18T04:28:36.195302+00:00 app[web.1]: 2025-09-18 04:28:36,195 DEBUG    HTTP close for ['10.1.25.72', 36784]
+2025-09-18T04:28:36.195439+00:00 app[web.1]: 2025-09-18 04:28:36,195 INFO     "10.1.25.72" - - [18/Sep/2025:04:28:35 +0000] "POST /api/webhook/ HTTP/1.1" 200 335 "-" "TwilioProxy/1.1"
+2025-09-18T04:28:36.195523+00:00 app[web.1]: 2025-09-18 04:28:36,195 DEBUG    HTTP response complete for ['10.1.25.72', 36784]
+2025-09-18T04:28:36.195560+00:00 app[web.1]: 10.1.25.72:36784 - - [18/Sep/2025:04:28:36] "POST /api/webhook/" 200 335
+2025-09-18T04:28:34.000000+00:00 app[heroku-redis]: source=REDIS addon=redis-deep-24044 sample#active-connections=1 sample#max-connections=18 sample#connection-percentage-used=0.05556 sample#load-avg-1m=0.855 sample#load-avg-5m=0.84 sample#load-avg-15m=0.85 sample#read-iops=0 sample#write-iops=0 sample#max-iops=3000 sample#iops-percentage-used=0.00000 sample#memory-total=16167796kB sample#memory-free=9675856kB sample#memory-percentage-used=0.40154 sample#memory-cached=1780604kB sample#memory-redis=4827432bytes sample#hit-rate=1 sample#evicted-keys=0
+2025-09-18T04:28:42.746079+00:00 app[web.1]: 10.1.47.206:32744 - - [18/Sep/2025:04:28:42] "WSCONNECTING /ws/realtime/6e010687-7e3a-4db7-9be5-5e6a369f998c/" - -
+2025-09-18T04:28:42.746174+00:00 app[web.1]: 2025-09-18 04:28:42,746 DEBUG    Upgraded connection ['10.1.47.206', 32744] to WebSocket
+2025-09-18T04:28:42.884257+00:00 app[web.1]: 2025-09-18 04:28:42,884 DEBUG    WebSocket ['10.1.47.206', 32744] open and established
+2025-09-18T04:28:42.884271+00:00 app[web.1]: 10.1.47.206:32744 - - [18/Sep/2025:04:28:42] "WSCONNECT /ws/realtime/6e010687-7e3a-4db7-9be5-5e6a369f998c/" - -
+2025-09-18T04:28:42.884321+00:00 app[web.1]: 2025-09-18 04:28:42,884 DEBUG    WebSocket ['10.1.47.206', 32744] accepted by application
+2025-09-18T04:28:42.884355+00:00 app[web.1]: 2025-09-18 04:28:42,884 INFO     WebSocket connected for session: 6e010687-7e3a-4db7-9be5-5e6a369f998c
+2025-09-18T04:28:42.899428+00:00 app[web.1]: 2025-09-18 04:28:42,899 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:42.899798+00:00 app[web.1]: 2025-09-18 04:28:42,899 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:42.921219+00:00 app[web.1]: 2025-09-18 04:28:42,921 INFO     Twilio connection established for session 6e010687-7e3a-4db7-9be5-5e6a369f998c
+2025-09-18T04:28:42.921249+00:00 app[web.1]: 2025-09-18 04:28:42,921 INFO     Session initialized, ready for Twilio messages
+2025-09-18T04:28:42.958406+00:00 app[web.1]: 2025-09-18 04:28:42,958 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:42.958665+00:00 app[web.1]: 2025-09-18 04:28:42,958 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:42.958880+00:00 app[web.1]: 2025-09-18 04:28:42,958 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:42.959105+00:00 app[web.1]: 2025-09-18 04:28:42,959 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:42.959328+00:00 app[web.1]: 2025-09-18 04:28:42,959 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:42.959563+00:00 app[web.1]: 2025-09-18 04:28:42,959 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:42.959774+00:00 app[web.1]: 2025-09-18 04:28:42,959 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:42.960016+00:00 app[web.1]: 2025-09-18 04:28:42,959 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:42.960242+00:00 app[web.1]: 2025-09-18 04:28:42,960 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:42.960465+00:00 app[web.1]: 2025-09-18 04:28:42,960 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:42.960687+00:00 app[web.1]: 2025-09-18 04:28:42,960 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:42.977936+00:00 app[web.1]: 2025-09-18 04:28:42,977 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:42.997981+00:00 app[web.1]: 2025-09-18 04:28:42,997 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.017811+00:00 app[web.1]: 2025-09-18 04:28:43,017 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.037844+00:00 app[web.1]: 2025-09-18 04:28:43,037 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.057790+00:00 app[web.1]: 2025-09-18 04:28:43,057 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.077866+00:00 app[web.1]: 2025-09-18 04:28:43,077 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.098948+00:00 app[web.1]: 2025-09-18 04:28:43,098 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.117913+00:00 app[web.1]: 2025-09-18 04:28:43,117 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.137861+00:00 app[web.1]: 2025-09-18 04:28:43,137 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.157981+00:00 app[web.1]: 2025-09-18 04:28:43,157 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.177838+00:00 app[web.1]: 2025-09-18 04:28:43,177 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.198044+00:00 app[web.1]: 2025-09-18 04:28:43,197 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.217738+00:00 app[web.1]: 2025-09-18 04:28:43,217 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.237804+00:00 app[web.1]: 2025-09-18 04:28:43,237 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.257837+00:00 app[web.1]: 2025-09-18 04:28:43,257 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.277915+00:00 app[web.1]: 2025-09-18 04:28:43,277 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.297926+00:00 app[web.1]: 2025-09-18 04:28:43,297 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.317881+00:00 app[web.1]: 2025-09-18 04:28:43,317 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.337842+00:00 app[web.1]: 2025-09-18 04:28:43,337 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.357869+00:00 app[web.1]: 2025-09-18 04:28:43,357 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.377930+00:00 app[web.1]: 2025-09-18 04:28:43,377 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.397887+00:00 app[web.1]: 2025-09-18 04:28:43,397 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.417867+00:00 app[web.1]: 2025-09-18 04:28:43,417 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.437913+00:00 app[web.1]: 2025-09-18 04:28:43,437 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.457843+00:00 app[web.1]: 2025-09-18 04:28:43,457 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.477858+00:00 app[web.1]: 2025-09-18 04:28:43,477 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.497892+00:00 app[web.1]: 2025-09-18 04:28:43,497 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.517914+00:00 app[web.1]: 2025-09-18 04:28:43,517 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.538081+00:00 app[web.1]: 2025-09-18 04:28:43,537 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.557896+00:00 app[web.1]: 2025-09-18 04:28:43,557 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.577967+00:00 app[web.1]: 2025-09-18 04:28:43,577 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.597902+00:00 app[web.1]: 2025-09-18 04:28:43,597 DEBUG    WebSocket incoming frame on ['10.1.47.206', 32744]
+2025-09-18T04:28:43.607752+00:00 app[web.1]: 2025-09-18 04:28:43,606 ERROR    Exception inside application: Error 1 connecting to ec2-3-219-4-191.compute-1.amazonaws.com:22340. 1.
+2025-09-18T04:28:43.607753+00:00 app[web.1]: Traceback (most recent call last):
+2025-09-18T04:28:43.607770+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/site-packages/redis/asyncio/connection.py", line 243, in connect
+2025-09-18T04:28:43.607771+00:00 app[web.1]:     await self.retry.call_with_retry(
+2025-09-18T04:28:43.607771+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/site-packages/redis/asyncio/retry.py", line 59, in call_with_retry
+2025-09-18T04:28:43.607772+00:00 app[web.1]:     return await do()
+2025-09-18T04:28:43.607772+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/site-packages/redis/asyncio/connection.py", line 650, in _connect
+2025-09-18T04:28:43.607773+00:00 app[web.1]:     reader, writer = await asyncio.open_connection(
+2025-09-18T04:28:43.607773+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/asyncio/streams.py", line 48, in open_connection
+2025-09-18T04:28:43.607773+00:00 app[web.1]:     transport, _ = await loop.create_connection(
+2025-09-18T04:28:43.607774+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/asyncio/base_events.py", line 1103, in create_connection
+2025-09-18T04:28:43.607774+00:00 app[web.1]:     transport, protocol = await self._create_connection_transport(
+2025-09-18T04:28:43.607775+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/asyncio/base_events.py", line 1133, in _create_connection_transport
+2025-09-18T04:28:43.607775+00:00 app[web.1]:     await waiter
+2025-09-18T04:28:43.607775+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/asyncio/sslproto.py", line 534, in data_received
+2025-09-18T04:28:43.607776+00:00 app[web.1]:     ssldata, appdata = self._sslpipe.feed_ssldata(data)
+2025-09-18T04:28:43.607776+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/asyncio/sslproto.py", line 188, in feed_ssldata
+2025-09-18T04:28:43.607776+00:00 app[web.1]:     self._sslobj.do_handshake()
+2025-09-18T04:28:43.607776+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/ssl.py", line 975, in do_handshake
+2025-09-18T04:28:43.607777+00:00 app[web.1]:     self._sslobj.do_handshake()
+2025-09-18T04:28:43.607778+00:00 app[web.1]: ssl.SSLCertVerificationError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate in certificate chain (_ssl.c:1007)
+2025-09-18T04:28:43.607778+00:00 app[web.1]: 
+2025-09-18T04:28:43.607786+00:00 app[web.1]: During handling of the above exception, another exception occurred:
+2025-09-18T04:28:43.607786+00:00 app[web.1]: 
+2025-09-18T04:28:43.607787+00:00 app[web.1]: Traceback (most recent call last):
+2025-09-18T04:28:43.607787+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/site-packages/channels/routing.py", line 62, in __call__
+2025-09-18T04:28:43.607787+00:00 app[web.1]:     return await application(scope, receive, send)
+2025-09-18T04:28:43.607787+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/site-packages/channels/sessions.py", line 47, in __call__
+2025-09-18T04:28:43.607787+00:00 app[web.1]:     return await self.inner(dict(scope, cookies=cookies), receive, send)
+2025-09-18T04:28:43.607788+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/site-packages/channels/sessions.py", line 263, in __call__
+2025-09-18T04:28:43.607788+00:00 app[web.1]:     return await self.inner(wrapper.scope, receive, wrapper.send)
+2025-09-18T04:28:43.607788+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/site-packages/channels/auth.py", line 185, in __call__
+2025-09-18T04:28:43.607788+00:00 app[web.1]:     return await super().__call__(scope, receive, send)
+2025-09-18T04:28:43.607788+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/site-packages/channels/middleware.py", line 24, in __call__
+2025-09-18T04:28:43.607788+00:00 app[web.1]:     return await self.inner(scope, receive, send)
+2025-09-18T04:28:43.607789+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/site-packages/channels/routing.py", line 116, in __call__
+2025-09-18T04:28:43.607789+00:00 app[web.1]:     return await application(
+2025-09-18T04:28:43.607789+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/site-packages/channels/consumer.py", line 94, in app
+2025-09-18T04:28:43.607790+00:00 app[web.1]:     return await consumer(scope, receive, send)
+2025-09-18T04:28:43.607790+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/site-packages/channels/consumer.py", line 58, in __call__
+2025-09-18T04:28:43.607790+00:00 app[web.1]:     await await_many_dispatch(
+2025-09-18T04:28:43.607790+00:00 app[web.1]:   File "/app/.heroku/python/lib/python3.10/site-packages/channels/utils.py", line 57, in await_many_dispatch
+2025-09-18T04:28:43.607791+00:00 app[web.1]:     await task
+2025-09-18T04:28:43.607791+00:00 app[web.1]: redis.exceptions.ConnectionError: Error 1 connecting to ec2-3-219-4-191.compute-1.amazonaws.com:22340. 1.
+2025-09-18T04:28:44.001469+00:00 heroku[router]: at=info method=GET path="/ws/realtime/6e010687-7e3a-4db7-9be5-5e6a369f998c/" host=openai-realtime-django-backend-f60c0c72a02b.herokuapp.com request_id=d4022375-bb4d-1e04-3e74-5e4bf2335d3d fwd="3.82.98.159" dyno=web.1 connect=0ms service=1258ms status=101 bytes=0 protocol=http1.1 tls=true tls_version=unknown
+2025-09-18T04:28:44.000872+00:00 app[web.1]: 2025-09-18 04:28:44,000 WARNING  dropping connection to peer tcp4:10.1.47.206:32744 with abort=True: WebSocket closing handshake timeout (peer did not finish the closing handshake in time)
+2025-09-18T04:28:44.001339+00:00 app[web.1]: 2025-09-18 04:28:44,001 DEBUG    WebSocket closed for ['10.1.47.206', 32744]
+2025-09-18T04:28:44.001389+00:00 app[web.1]: 10.1.47.206:32744 - - [18/Sep/2025:04:28:44] "WSDISCONNECT /ws/realtime/6e010687-7e3a-4db7-9be5-5e6a369f998c/" - -

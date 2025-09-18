@@ -78,11 +78,12 @@ WSGI_APPLICATION = 'realtime_backend.wsgi.application'
 ASGI_APPLICATION = 'realtime_backend.asgi.application'
 
 # Channels configuration
-# Redis configuration for Heroku production
+# Redis configuration with SSL bypass for Heroku
 redis_url = os.getenv('REDIS_TLS_URL') or os.getenv('REDIS_URL')
 
-if redis_url and 'herokuapp.com' in os.getenv('DYNO', ''):
-    # Production Heroku with Redis
+if redis_url:
+    # Configure Redis with SSL certificate bypass for Heroku
+    import ssl
     CHANNEL_LAYERS = {
         'default': {
             'BACKEND': 'channels_redis.core.RedisChannelLayer',
@@ -90,21 +91,15 @@ if redis_url and 'herokuapp.com' in os.getenv('DYNO', ''):
                 "hosts": [redis_url],
                 "capacity": 1500,
                 "expiry": 10,
-            },
-        },
-    }
-elif redis_url:
-    # Local development with Redis
-    CHANNEL_LAYERS = {
-        'default': {
-            'BACKEND': 'channels_redis.core.RedisChannelLayer',
-            'CONFIG': {
-                "hosts": [redis_url],
+                # SSL configuration for Heroku Redis
+                "ssl_cert_reqs": None,
+                "ssl_check_hostname": False,
+                "ssl_ca_certs": None,
             },
         },
     }
 else:
-    # Fallback to InMemory
+    # Fallback to InMemory for local development
     CHANNEL_LAYERS = {
         'default': {
             'BACKEND': 'channels.layers.InMemoryChannelLayer',
