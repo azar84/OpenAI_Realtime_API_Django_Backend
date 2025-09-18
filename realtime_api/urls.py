@@ -13,4 +13,6 @@ urlpatterns = [
     path('tools/', views.get_tools, name='get_tools'),
     path('public-url/', views.get_public_url, name='get_public_url'),
     path('template-instructions/', views.get_template_instructions, name='get_template_instructions'),
+    path('conversation-history/<str:session_id>/', views.conversation_history, name='conversation_history'),
+    path('conversation-events/<str:session_id>/', views.conversation_events, name='conversation_events'),
 ]

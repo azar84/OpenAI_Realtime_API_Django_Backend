@@ -10,6 +10,7 @@ import base64
 from typing import Optional, Dict, Any
 from django.conf import settings
 import logging
+from .conversation_tracker import conversation_tracker
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,7 @@ class RealtimeSession:
         self.response_start_timestamp: Optional[float] = None
         self.latest_media_timestamp: Optional[float] = None
         self.agent_config = agent_config
+        self.conversation = None  # Will be set when call session is available
         
         # DEBUG: Log what agent config we received
         if agent_config:
@@ -253,6 +255,14 @@ class RealtimeSession:
         except Exception as e:
             logger.error(f"Error sending initial greeting: {e}")
     
+    async def initialize_conversation_tracking(self, call_session):
+        """Initialize conversation tracking for this session"""
+        try:
+            self.conversation = await conversation_tracker.get_or_create_conversation(call_session)
+            logger.info(f"📝 Conversation tracking initialized for session {self.session_id[:8]}...")
+        except Exception as e:
+            logger.error(f"Error initializing conversation tracking: {e}")
+    
     async def listen_to_model(self):
         """Listen for responses from OpenAI"""
         try:
@@ -272,6 +282,10 @@ class RealtimeSession:
         try:
             event = json.loads(data)
             event_type = event.get('type')
+            
+            # Track all events for conversation history
+            if self.conversation:
+                await conversation_tracker.handle_realtime_event(self.conversation, event)
             
             if event_type == 'input_audio_buffer.speech_started':
                 await self.handle_speech_interruption()

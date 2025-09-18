@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
 from django import forms
-from .models import AgentConfiguration, CallSession, UserProfile, PhoneNumber, InstructionTemplate
+from .models import AgentConfiguration, CallSession, UserProfile, PhoneNumber, InstructionTemplate, Conversation, Event, Turn
 
 # UserProfile inline admin
 class UserProfileInline(admin.StackedInline):
@@ -253,6 +253,43 @@ class AgentConfigurationAdmin(admin.ModelAdmin):
             'all': ('admin/css/agent_admin.css',)
         }
         js = ('admin/js/agent_admin.js', 'admin/js/template_loader.js')
+
+@admin.register(Conversation)
+class ConversationAdmin(admin.ModelAdmin):
+    list_display = ('id', 'call_session', 'started_at', 'ended_at', 'turn_count', 'event_count')
+    list_filter = ('started_at', 'ended_at', 'call_session__agent_config')
+    readonly_fields = ('started_at', 'ended_at')
+    
+    def turn_count(self, obj):
+        return obj.turns.count()
+    turn_count.short_description = 'Turns'
+    
+    def event_count(self, obj):
+        return obj.events.count()
+    event_count.short_description = 'Events'
+
+
+@admin.register(Turn)
+class TurnAdmin(admin.ModelAdmin):
+    list_display = ('id', 'conversation', 'role', 'text_preview', 'started_at', 'completed_at')
+    list_filter = ('role', 'started_at', 'conversation__call_session__agent_config')
+    readonly_fields = ('started_at', 'completed_at')
+    
+    def text_preview(self, obj):
+        return obj.text[:100] + "..." if len(obj.text) > 100 else obj.text
+    text_preview.short_description = 'Message'
+
+
+@admin.register(Event)
+class EventAdmin(admin.ModelAdmin):
+    list_display = ('id', 'conversation', 'event_type', 'role', 'text_delta_preview', 'created_at')
+    list_filter = ('event_type', 'role', 'created_at')
+    readonly_fields = ('created_at',)
+    
+    def text_delta_preview(self, obj):
+        return obj.text_delta[:50] + "..." if len(obj.text_delta) > 50 else obj.text_delta
+    text_delta_preview.short_description = 'Text Delta'
+
 
 @admin.register(CallSession)
 class CallSessionAdmin(admin.ModelAdmin):

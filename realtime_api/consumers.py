@@ -41,6 +41,10 @@ class RealtimeConsumer(AsyncWebsocketConsumer):
         # Get the realtime session from session manager
         self.realtime_session = session_manager.get_session(self.session_id, agent_config)
         
+        # Initialize conversation tracking
+        if self.call_session:
+            await self.realtime_session.initialize_conversation_tracking(self.call_session)
+        
         # Set this consumer as the Twilio connection
         self.realtime_session.set_twilio_connection(self)
         

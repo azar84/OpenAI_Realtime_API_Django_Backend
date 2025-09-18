@@ -125,3 +125,89 @@ def get_template_instructions(request):
         })
     except InstructionTemplate.DoesNotExist:
         return JsonResponse({'error': 'Template not found'}, status=404)
+
+@csrf_exempt
+def conversation_history(request, session_id):
+    """Get conversation history for a call session"""
+    from django.http import JsonResponse
+    from .models import CallSession, Conversation, Turn, Event
+    
+    try:
+        call_session = CallSession.objects.get(session_id=session_id)
+        conversations = call_session.conversations.prefetch_related('turns', 'events').all()
+        
+        history_data = {
+            'session_id': session_id,
+            'call_info': {
+                'caller_number': call_session.caller_number,
+                'called_number': call_session.called_number,
+                'agent': call_session.agent_config.name if call_session.agent_config else None,
+                'status': call_session.status,
+                'start_time': call_session.call_start_time.isoformat() if call_session.call_start_time else None,
+                'end_time': call_session.call_end_time.isoformat() if call_session.call_end_time else None,
+            },
+            'conversations': []
+        }
+        
+        for conversation in conversations:
+            turns_data = []
+            for turn in conversation.turns.order_by('started_at'):
+                turns_data.append({
+                    'role': turn.role,
+                    'text': turn.text,
+                    'meta': turn.meta,
+                    'started_at': turn.started_at.isoformat(),
+                    'completed_at': turn.completed_at.isoformat() if turn.completed_at else None
+                })
+            
+            conversation_data = {
+                'id': conversation.id,
+                'started_at': conversation.started_at.isoformat(),
+                'ended_at': conversation.ended_at.isoformat() if conversation.ended_at else None,
+                'turns': turns_data,
+                'event_count': conversation.events.count()
+            }
+            
+            history_data['conversations'].append(conversation_data)
+        
+        return JsonResponse(history_data)
+        
+    except CallSession.DoesNotExist:
+        return JsonResponse({'error': 'Session not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt 
+def conversation_events(request, session_id):
+    """Get raw events for debugging"""
+    from django.http import JsonResponse
+    from .models import CallSession, Event
+    
+    try:
+        call_session = CallSession.objects.get(session_id=session_id)
+        conversations = call_session.conversations.all()
+        
+        all_events = []
+        for conversation in conversations:
+            events = conversation.events.order_by('created_at')[:100]  # Limit for performance
+            for event in events:
+                all_events.append({
+                    'event_type': event.event_type,
+                    'event_id': event.event_id,
+                    'item_id': event.item_id,
+                    'response_id': event.response_id,
+                    'role': event.role,
+                    'text_delta': event.text_delta,
+                    'error': event.error,
+                    'created_at': event.created_at.isoformat(),
+                    'payload': event.payload
+                })
+        
+        return JsonResponse({
+            'session_id': session_id,
+            'events': all_events,
+            'total_events': len(all_events)
+        })
+        
+    except CallSession.DoesNotExist:
+        return JsonResponse({'error': 'Session not found'}, status=404)

@@ -312,6 +312,60 @@ class AgentConfiguration(models.Model):
             
         return config
 
+class Conversation(models.Model):
+    """A conversation within a call session"""
+    call_session = models.ForeignKey('CallSession', on_delete=models.CASCADE, related_name='conversations')
+    started_at = models.DateTimeField(auto_now_add=True)
+    ended_at = models.DateTimeField(null=True, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    
+    def __str__(self):
+        return f"Conversation {self.id} - {self.call_session.session_id[:8]}..."
+
+
+class Event(models.Model):
+    """Raw OpenAI Realtime API events for audit trail"""
+    conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name="events")
+    event_type = models.CharField(max_length=80, help_text="e.g., response.output_text.delta")
+    event_id = models.CharField(max_length=128, blank=True, help_text="Server-assigned event ID")
+    item_id = models.CharField(max_length=128, blank=True, help_text="Conversation item ID")
+    response_id = models.CharField(max_length=128, blank=True, help_text="Response ID for grouping deltas")
+    role = models.CharField(max_length=16, blank=True, help_text="user | assistant")
+    payload = models.JSONField(default=dict, help_text="Raw event data")
+    text_delta = models.TextField(blank=True, help_text="Text content for accumulation")
+    error = models.TextField(blank=True, help_text="Error message if applicable")
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['conversation', 'event_type']),
+            models.Index(fields=['conversation', 'response_id']),
+            models.Index(fields=['conversation', 'item_id']),
+        ]
+    
+    def __str__(self):
+        return f"{self.event_type} - {self.created_at}"
+
+
+class Turn(models.Model):
+    """Complete user or assistant message (materialized from events)"""
+    conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name="turns")
+    role = models.CharField(max_length=16, choices=[('user', 'User'), ('assistant', 'Assistant')])
+    text = models.TextField(blank=True, help_text="Complete message text")
+    audio_url = models.URLField(blank=True, help_text="URL to audio file if persisted")
+    meta = models.JSONField(default=dict, blank=True, help_text="Additional metadata")
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['started_at']
+    
+    def __str__(self):
+        preview = self.text[:50] + "..." if len(self.text) > 50 else self.text
+        return f"{self.role}: {preview}"
+
+
 class CallSession(models.Model):
     """Track call sessions"""
     session_id = models.CharField(max_length=100, unique=True)
