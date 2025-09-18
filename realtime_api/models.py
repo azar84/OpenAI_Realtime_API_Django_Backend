@@ -117,14 +117,16 @@ class AgentConfiguration(models.Model):
     model = models.CharField(
         max_length=50,
         choices=[
-            ('gpt-4o-realtime-preview-2024-12-17', 'GPT-4o Realtime (2024-12-17)'),
-            ('gpt-4o-realtime-preview-2025-06-03', 'GPT-4o Realtime (2025-06-03)'),
-            ('gpt-4o-realtime-preview-2024-10-01', 'GPT-4o Realtime (2024-10-01)'),
-            ('gpt-4o-mini-realtime-preview-2024-12-17', 'GPT-4o Mini Realtime (2024-12-17)'),
-            ('gpt-4o-mini-realtime-preview', 'GPT-4o Mini Realtime'),
-            ('gpt-realtime', 'GPT Realtime'),
+            ('gpt-4o-realtime-preview', 'gpt-4o-realtime-preview'),
+            ('gpt-realtime-2025-08-28', 'gpt-realtime-2025-08-28'),
+            ('gpt-realtime', 'gpt-realtime'),
+            ('gpt-4o-realtime-preview-2025-06-03', 'gpt-4o-realtime-preview-2025-06-03'),
+            ('gpt-4o-realtime-preview-2024-12-17', 'gpt-4o-realtime-preview-2024-12-17'),
+            ('gpt-4o-realtime-preview-2024-10-01', 'gpt-4o-realtime-preview-2024-10-01'),
+            ('gpt-4o-mini-realtime-preview-2024-12-17', 'gpt-4o-mini-realtime-preview-2024-12-17'),
+            ('gpt-4o-mini-realtime-preview', 'gpt-4o-mini-realtime-preview'),
         ],
-        default='gpt-4o-realtime-preview-2024-12-17',
+        default='gpt-realtime',
         help_text="Choose the OpenAI Realtime model for this agent"
     )
     

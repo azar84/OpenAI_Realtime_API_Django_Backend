@@ -176,16 +176,18 @@ TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN')
 
 # Realtime API Configuration
 OPENAI_REALTIME_URL = 'wss://api.openai.com/v1/realtime'
-OPENAI_REALTIME_MODEL = 'gpt-4o-realtime-preview-2024-12-17'  # Latest model
+OPENAI_REALTIME_MODEL = 'gpt-realtime'  # Stable default model
 
-# Available Realtime Models
+# Available Realtime Models (from OpenAI API)
 OPENAI_REALTIME_MODELS = [
+    'gpt-4o-realtime-preview',
+    'gpt-realtime-2025-08-28',
+    'gpt-realtime',
+    'gpt-4o-realtime-preview-2025-06-03',
     'gpt-4o-realtime-preview-2024-12-17',
-    'gpt-4o-realtime-preview-2025-06-03', 
     'gpt-4o-realtime-preview-2024-10-01',
     'gpt-4o-mini-realtime-preview-2024-12-17',
     'gpt-4o-mini-realtime-preview',
-    'gpt-realtime',
 ]
 
 # CORS settings for development
