@@ -98,16 +98,35 @@ class AgentConfiguration(models.Model):
         max_length=20, 
         choices=[
             ('alloy', 'Alloy'),
+            ('ash', 'Ash'),
+            ('ballad', 'Ballad'),
+            ('cedar', 'Cedar'),
+            ('coral', 'Coral'),
             ('echo', 'Echo'),
-            ('fable', 'Fable'),
-            ('onyx', 'Onyx'),
-            ('nova', 'Nova'),
+            ('marin', 'Marin'),
+            ('sage', 'Sage'),
             ('shimmer', 'Shimmer'),
+            ('verse', 'Verse'),
         ],
         default='alloy'
     )
     temperature = models.FloatField(default=0.8)
     max_response_output_tokens = models.CharField(max_length=10, default="inf")
+    
+    # Model selection
+    model = models.CharField(
+        max_length=50,
+        choices=[
+            ('gpt-4o-realtime-preview-2024-12-17', 'GPT-4o Realtime (2024-12-17)'),
+            ('gpt-4o-realtime-preview-2025-06-03', 'GPT-4o Realtime (2025-06-03)'),
+            ('gpt-4o-realtime-preview-2024-10-01', 'GPT-4o Realtime (2024-10-01)'),
+            ('gpt-4o-mini-realtime-preview-2024-12-17', 'GPT-4o Mini Realtime (2024-12-17)'),
+            ('gpt-4o-mini-realtime-preview', 'GPT-4o Mini Realtime'),
+            ('gpt-realtime', 'GPT Realtime'),
+        ],
+        default='gpt-4o-realtime-preview-2024-12-17',
+        help_text="Choose the OpenAI Realtime model for this agent"
+    )
     
     # Audio settings
     input_audio_format = models.CharField(max_length=20, default="g711_ulaw")
@@ -120,7 +139,16 @@ class AgentConfiguration(models.Model):
     
     # Transcription settings
     enable_input_transcription = models.BooleanField(default=True)
-    transcription_model = models.CharField(max_length=50, default="whisper-1")
+    transcription_model = models.CharField(
+        max_length=50, 
+        choices=[
+            ('whisper-1', 'Whisper-1'),
+            ('gpt-4o-mini-transcribe', 'GPT-4o Mini Transcribe'),
+            ('gpt-4o-transcribe', 'GPT-4o Transcribe'),
+        ],
+        default="whisper-1",
+        help_text="Choose the transcription model for speech-to-text"
+    )
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

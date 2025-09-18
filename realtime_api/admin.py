@@ -125,6 +125,10 @@ class AgentConfigurationAdmin(admin.ModelAdmin):
         ('Voice Settings', {
             'fields': ('voice', 'temperature', 'max_response_output_tokens')
         }),
+        ('Model Settings', {
+            'fields': ('model',),
+            'description': 'Choose the OpenAI Realtime model for this agent'
+        }),
         ('Audio Settings', {
             'fields': ('input_audio_format', 'output_audio_format')
         }),

@@ -136,7 +136,9 @@ class RealtimeSession:
                 "OpenAI-Beta": "realtime=v1"
             }
             
-            model_url = f"{settings.OPENAI_REALTIME_URL}?model={settings.OPENAI_REALTIME_MODEL}"
+            # Use agent's model if available, otherwise use system default
+            model_name = self.agent_config.model if self.agent_config else settings.OPENAI_REALTIME_MODEL
+            model_url = f"{settings.OPENAI_REALTIME_URL}?model={model_name}"
             
             # DEBUG: Log connection details
             logger.info(f"Connecting to OpenAI with key: {self.openai_api_key[:20]}...")

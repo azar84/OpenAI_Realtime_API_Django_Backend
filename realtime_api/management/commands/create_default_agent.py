@@ -16,7 +16,7 @@ class Command(BaseCommand):
             '--voice',
             type=str,
             default='alloy',
-            choices=['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'],
+            choices=['alloy', 'ash', 'ballad', 'cedar', 'coral', 'echo', 'marin', 'sage', 'shimmer', 'verse'],
             help='Voice for the agent',
         )
         parser.add_argument(
