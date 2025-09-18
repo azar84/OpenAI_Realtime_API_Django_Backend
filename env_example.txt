@@ -1,0 +1,13 @@
+# OpenAI Configuration
+OPENAI_API_KEY=your_openai_api_key_here
+
+# Twilio Configuration  
+TWILIO_ACCOUNT_SID=your_twilio_account_sid_here
+TWILIO_AUTH_TOKEN=your_twilio_auth_token_here
+
+# Django Configuration
+SECRET_KEY=your_secret_key_here
+DEBUG=True
+
+# Redis Configuration (for Channels)
+REDIS_URL=redis://localhost:6379
