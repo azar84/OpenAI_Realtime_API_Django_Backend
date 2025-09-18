@@ -78,11 +78,11 @@ WSGI_APPLICATION = 'realtime_backend.wsgi.application'
 ASGI_APPLICATION = 'realtime_backend.asgi.application'
 
 # Channels configuration
-# Redis configuration with SSL bypass for Heroku
+# Redis configuration for Heroku
 redis_url = os.getenv('REDIS_TLS_URL') or os.getenv('REDIS_URL')
 
 if redis_url:
-    # Configure Redis with SSL certificate bypass for Heroku
+    # Configure Redis with SSL bypass using connection_kwargs
     import ssl
     CHANNEL_LAYERS = {
         'default': {
@@ -91,10 +91,10 @@ if redis_url:
                 "hosts": [redis_url],
                 "capacity": 1500,
                 "expiry": 10,
-                # SSL configuration for Heroku Redis
-                "ssl_cert_reqs": None,
-                "ssl_check_hostname": False,
-                "ssl_ca_certs": None,
+                "connection_kwargs": {
+                    "ssl_cert_reqs": ssl.CERT_NONE,
+                    "ssl_check_hostname": False,
+                },
             },
         },
     }
