@@ -78,28 +78,27 @@ WSGI_APPLICATION = 'realtime_backend.wsgi.application'
 ASGI_APPLICATION = 'realtime_backend.asgi.application'
 
 # Channels configuration
-# Use Redis for production (Heroku) or InMemory for development
-redis_url = os.getenv('REDIS_URL')
-if redis_url:
-    # Simple Redis configuration for Heroku
-    # Heroku Redis URLs include all necessary connection info
-    CHANNEL_LAYERS = {
-        'default': {
-            'BACKEND': 'channels_redis.core.RedisChannelLayer',
-            'CONFIG': {
-                "hosts": [redis_url],
-                "capacity": 1500,
-                "expiry": 10,
-                "symmetric_encryption_keys": [os.getenv('SECRET_KEY', 'fallback-key')],
-            },
-        },
-    }
-else:
-    CHANNEL_LAYERS = {
-        'default': {
-            'BACKEND': 'channels.layers.InMemoryChannelLayer',
-        },
-    }
+# Use InMemory for now (Redis SSL issues on Heroku)
+# TODO: Fix Redis SSL configuration later
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}
+
+# Redis configuration (disabled due to SSL issues)
+# redis_url = os.getenv('REDIS_URL')
+# if redis_url:
+#     CHANNEL_LAYERS = {
+#         'default': {
+#             'BACKEND': 'channels_redis.core.RedisChannelLayer',
+#             'CONFIG': {
+#                 "hosts": [redis_url],
+#                 "capacity": 1500,
+#                 "expiry": 10,
+#             },
+#         },
+#     }
 
 
 # Database
