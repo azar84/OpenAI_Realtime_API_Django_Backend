@@ -133,9 +133,42 @@ class AgentConfiguration(models.Model):
     output_audio_format = models.CharField(max_length=20, default="g711_ulaw")
     
     # VAD settings
-    vad_threshold = models.FloatField(default=0.5)
-    vad_prefix_padding_ms = models.IntegerField(default=300)
-    vad_silence_duration_ms = models.IntegerField(default=200)
+    vad_type = models.CharField(
+        max_length=20,
+        choices=[
+            ('server_vad', 'Server VAD (silence-based)'),
+            ('semantic_vad', 'Semantic VAD (context-based)'),
+        ],
+        default='server_vad',
+        help_text="Voice activity detection mode"
+    )
+    
+    # Server VAD settings (used when vad_type = 'server_vad')
+    vad_threshold = models.FloatField(
+        default=0.5,
+        help_text="Activation threshold (0-1). Higher = requires louder audio, better for noisy environments"
+    )
+    vad_prefix_padding_ms = models.IntegerField(
+        default=300,
+        help_text="Audio to include before detected speech (milliseconds)"
+    )
+    vad_silence_duration_ms = models.IntegerField(
+        default=500,
+        help_text="Silence duration to detect speech stop (milliseconds). Shorter = faster turn detection"
+    )
+    
+    # Semantic VAD settings (used when vad_type = 'semantic_vad')
+    vad_eagerness = models.CharField(
+        max_length=10,
+        choices=[
+            ('low', 'Low - Let user take their time'),
+            ('medium', 'Medium - Balanced (default)'),
+            ('high', 'High - Interrupt as soon as possible'),
+            ('auto', 'Auto - Same as medium'),
+        ],
+        default='auto',
+        help_text="How eager the model is to interrupt the user (semantic VAD only)"
+    )
     
     # Transcription settings
     enable_input_transcription = models.BooleanField(default=True)
@@ -187,15 +220,27 @@ class AgentConfiguration(models.Model):
             "output_audio_format": self.output_audio_format,
             "temperature": self.temperature,
             "max_response_output_tokens": self.max_response_output_tokens,
-            "turn_detection": {
-                "type": "server_vad",
-                "threshold": self.vad_threshold,
-                "prefix_padding_ms": self.vad_prefix_padding_ms,
-                "silence_duration_ms": self.vad_silence_duration_ms
-            },
             "tools": [],
             "tool_choice": "auto"
         }
+        
+        # Configure turn detection based on VAD type
+        if self.vad_type == 'semantic_vad':
+            config["turn_detection"] = {
+                "type": "semantic_vad",
+                "eagerness": self.vad_eagerness,
+                "create_response": True,
+                "interrupt_response": True
+            }
+        else:  # server_vad (default)
+            config["turn_detection"] = {
+                "type": "server_vad",
+                "threshold": self.vad_threshold,
+                "prefix_padding_ms": self.vad_prefix_padding_ms,
+                "silence_duration_ms": self.vad_silence_duration_ms,
+                "create_response": True,
+                "interrupt_response": True
+            }
         
         if self.enable_input_transcription:
             config["input_audio_transcription"] = {

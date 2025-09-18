@@ -133,7 +133,8 @@ class AgentConfigurationAdmin(admin.ModelAdmin):
             'fields': ('input_audio_format', 'output_audio_format')
         }),
         ('Voice Activity Detection', {
-            'fields': ('vad_threshold', 'vad_prefix_padding_ms', 'vad_silence_duration_ms')
+            'fields': ('vad_type', 'vad_threshold', 'vad_prefix_padding_ms', 'vad_silence_duration_ms', 'vad_eagerness'),
+            'description': 'Configure how the AI detects when you start/stop speaking'
         }),
         ('Transcription', {
             'fields': ('enable_input_transcription', 'transcription_model')
