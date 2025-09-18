@@ -31,7 +31,11 @@ class RealtimeSession:
         if agent_config:
             try:
                 logger.info(f"🤖 Session {session_id} initialized with agent: {agent_config.name} (ID: {agent_config.id})")
-            except:
+                # Set the saved config from agent configuration
+                self.saved_config = agent_config.to_openai_config()
+                logger.info(f"🎯 Agent config loaded: voice={agent_config.voice}, instructions={agent_config.instructions[:50]}...")
+            except Exception as e:
+                logger.warning(f"🤖 Error loading agent config: {e}")
                 logger.info(f"🤖 Session {session_id} initialized with agent config")
         else:
             logger.warning(f"🤖 Session {session_id} initialized with NO agent config")
@@ -167,6 +171,10 @@ class RealtimeSession:
             # Use agent configuration if available, otherwise use defaults
             if self.agent_config and self.saved_config:
                 config = self.saved_config
+                # Override audio formats for Twilio compatibility
+                config["input_audio_format"] = "g711_ulaw"  # Twilio sends this format
+                config["output_audio_format"] = "g711_ulaw" # Twilio expects this format
+                logger.info(f"🎯 Using agent config with Twilio audio formats")
             else:
                 config = {
                     "modalities": ["text", "audio"],
@@ -176,6 +184,7 @@ class RealtimeSession:
                     "input_audio_format": "g711_ulaw",  # Twilio format
                     "output_audio_format": "g711_ulaw", # Twilio format
                 }
+                logger.info(f"🎯 Using default config with Twilio audio formats")
             
             session_config = {
                 "type": "session.update",
@@ -183,6 +192,7 @@ class RealtimeSession:
             }
             
             await self.send_to_model(session_config)
+            logger.info(f"🎯 OpenAI session configured with: voice={config.get('voice', 'default')}, instructions={config.get('instructions', 'default')[:50]}...")
             logger.info("OpenAI session configured successfully")
             
         except Exception as e:
