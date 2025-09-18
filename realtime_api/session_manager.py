@@ -273,6 +273,8 @@ class RealtimeSession:
     
     async def handle_function_call(self, item):
         """Handle function calls from OpenAI"""
+        from .tools import execute_tool
+        
         function_name = item.get('name', '')
         arguments = item.get('arguments', '{}')
         call_id = item.get('call_id')
@@ -283,13 +285,8 @@ class RealtimeSession:
             # Parse arguments
             args = json.loads(arguments)
             
-            # Handle different functions
-            if function_name == 'get_weather':
-                result = await self.get_weather(args.get('location', ''))
-            elif function_name == 'get_time':
-                result = await self.get_current_time()
-            else:
-                result = {"error": f"Unknown function: {function_name}"}
+            # Execute tool using the tools module
+            result = await execute_tool(function_name, args)
             
             # Send result back to OpenAI
             function_output = {
@@ -387,25 +384,6 @@ class RealtimeSession:
         self.response_start_timestamp = None
         self.latest_media_timestamp = None
         self.saved_config = None
-    
-    # Function implementations
-    async def get_weather(self, location):
-        """Mock weather function"""
-        return {
-            "location": location,
-            "temperature": "72°F",
-            "condition": "Sunny",
-            "humidity": "45%"
-        }
-    
-    async def get_current_time(self):
-        """Get current time"""
-        from datetime import datetime
-        now = datetime.now()
-        return {
-            "current_time": now.strftime("%Y-%m-%d %H:%M:%S"),
-            "timezone": "UTC"
-        }
 
 
 # Global session manager

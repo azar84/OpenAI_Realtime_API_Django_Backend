@@ -84,34 +84,9 @@ def health_check(request):
 @csrf_exempt
 def get_tools(request):
     """Get available function tools for the AI agent"""
-    # Example tools - you can expand this based on your needs
-    tools = [
-        {
-            "type": "function",
-            "name": "get_weather",
-            "description": "Get current weather for a location",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "location": {
-                        "type": "string",
-                        "description": "The city and state, e.g. San Francisco, CA"
-                    }
-                },
-                "required": ["location"]
-            }
-        },
-        {
-            "type": "function", 
-            "name": "get_time",
-            "description": "Get current time",
-            "parameters": {
-                "type": "object",
-                "properties": {},
-                "required": []
-            }
-        }
-    ]
+    from .tools import get_tools_for_openai
+    
+    tools = get_tools_for_openai()
     
     from django.http import JsonResponse
     return JsonResponse({"tools": tools})
@@ -126,3 +101,27 @@ def get_public_url(request):
     public_url = f"{protocol}://{host}"
     
     return JsonResponse({"publicUrl": public_url})
+
+@csrf_exempt
+def get_template_instructions(request):
+    """Get instructions for a specific template"""
+    from django.http import JsonResponse
+    from .models import InstructionTemplate
+    
+    template_id = request.GET.get('template_id')
+    agent_name = request.GET.get('agent_name', 'Agent')
+    
+    if not template_id:
+        return JsonResponse({'error': 'template_id is required'}, status=400)
+    
+    try:
+        template = InstructionTemplate.objects.get(id=template_id, is_active=True)
+        formatted_instructions = template.get_formatted_instructions(agent_name)
+        
+        return JsonResponse({
+            'instructions': formatted_instructions,
+            'template_name': template.name,
+            'template_description': template.description
+        })
+    except InstructionTemplate.DoesNotExist:
+        return JsonResponse({'error': 'Template not found'}, status=404)

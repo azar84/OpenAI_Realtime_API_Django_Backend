@@ -1,0 +1,153 @@
+/* Custom CSS for Agent Configuration Admin */
+
+/* Slider styling */
+.slider-with-value {
+    width: 300px !important;
+    height: 6px;
+    background: #ddd;
+    border-radius: 3px;
+    outline: none;
+    margin-right: 10px;
+}
+
+/* Slider thumb styling */
+.slider-with-value::-webkit-slider-thumb {
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    background: #0073aa;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.slider-with-value::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    background: #0073aa;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* Temperature slider specific styling */
+.temperature-slider {
+    background: linear-gradient(to right, #0073aa 0%, #00a32a 50%, #d63638 100%);
+}
+
+/* VAD threshold slider specific styling */
+.vad-slider {
+    background: linear-gradient(to right, #d63638 0%, #00a32a 50%, #0073aa 100%);
+}
+
+/* Value display styling */
+.slider-value-display {
+    display: inline-block;
+    min-width: 60px;
+    text-align: center;
+    font-family: monospace;
+}
+
+/* Fieldset styling improvements */
+.aligned .form-row {
+    margin-bottom: 15px;
+}
+
+/* Enhanced help text */
+.help {
+    font-size: 11px;
+    color: #666;
+    margin-top: 5px;
+    font-style: italic;
+}
+
+/* Temperature field container */
+.field-temperature .form-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.field-temperature label {
+    margin-right: 10px;
+    min-width: 120px;
+}
+
+/* VAD threshold field container */
+.field-vad_threshold .form-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.field-vad_threshold label {
+    margin-right: 10px;
+    min-width: 120px;
+}
+
+/* Instructions textarea styling */
+.field-instructions textarea {
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.4;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 8px;
+}
+
+.field-instructions textarea:focus {
+    border-color: #0073aa;
+    box-shadow: 0 0 0 1px #0073aa;
+    outline: none;
+}
+
+/* Max tokens field styling */
+.field-max_response_output_tokens input {
+    width: 200px;
+    font-family: monospace;
+}
+
+/* Fieldset descriptions */
+.description {
+    background: #f0f6fc;
+    border-left: 4px solid #0073aa;
+    padding: 8px 12px;
+    margin-bottom: 15px;
+    font-size: 12px;
+    color: #0c5460;
+}
+
+/* Voice Activity Detection section styling */
+fieldset h2:contains("Voice Activity Detection") + .description {
+    background: #fff8e1;
+    border-left-color: #ff9800;
+    color: #e65100;
+}
+
+/* Voice Settings section styling */
+fieldset h2:contains("Voice Settings") + .description {
+    background: #e8f5e8;
+    border-left-color: #4caf50;
+    color: #2e7d32;
+}
+
+/* Responsive design for smaller screens */
+@media (max-width: 768px) {
+    .slider-with-value {
+        width: 100% !important;
+        max-width: 250px;
+    }
+    
+    .field-temperature .form-row,
+    .field-vad_threshold .form-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .field-temperature label,
+    .field-vad_threshold label {
+        margin-bottom: 5px;
+    }
+}

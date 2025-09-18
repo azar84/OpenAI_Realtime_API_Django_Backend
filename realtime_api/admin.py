@@ -1,7 +1,8 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
-from .models import AgentConfiguration, CallSession, UserProfile, PhoneNumber
+from django import forms
+from .models import AgentConfiguration, CallSession, UserProfile, PhoneNumber, InstructionTemplate
 
 # UserProfile inline admin
 class UserProfileInline(admin.StackedInline):
@@ -67,6 +68,37 @@ class UserProfileAdmin(admin.ModelAdmin):
             return qs
         return qs.filter(user=request.user)
 
+@admin.register(InstructionTemplate)
+class InstructionTemplateAdmin(admin.ModelAdmin):
+    list_display = ('name', 'category', 'is_active', 'created_at')
+    list_filter = ('category', 'is_active', 'created_at')
+    search_fields = ('name', 'description', 'instructions')
+    readonly_fields = ('created_at', 'updated_at')
+    
+    fieldsets = (
+        ('Template Info', {
+            'fields': ('name', 'category', 'description', 'is_active')
+        }),
+        ('Instructions', {
+            'fields': ('instructions',),
+            'description': 'Use {name} as a placeholder for the agent name. Example: "Your name is **{name}**."'
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if db_field.name == "instructions":
+            kwargs["widget"] = forms.Textarea(attrs={
+                'rows': 20,
+                'cols': 100,
+                'placeholder': 'Enter instructions template with {name} placeholders...'
+            })
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
+
+
 @admin.register(PhoneNumber)
 class PhoneNumberAdmin(admin.ModelAdmin):
     list_display = ('phone_number', 'user', 'agent_config', 'is_active', 'created_at')
@@ -120,10 +152,12 @@ class AgentConfigurationAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Basic Configuration', {
-            'fields': ('user', 'name', 'instructions', 'is_active')
+            'fields': ('user', 'name', 'instruction_template', 'instructions', 'is_active'),
+            'description': 'Select a template or use custom instructions. Template will override custom instructions if selected.'
         }),
         ('Voice Settings', {
-            'fields': ('voice', 'temperature', 'max_response_output_tokens')
+            'fields': ('voice', 'temperature', 'max_response_output_tokens'),
+            'description': 'Temperature must be between 0.6 and 1.2 for OpenAI Realtime API'
         }),
         ('Model Settings', {
             'fields': ('model',),
@@ -164,6 +198,61 @@ class AgentConfigurationAdmin(admin.ModelAdmin):
         if not change and not request.user.is_superuser:
             obj.user = request.user
         super().save_model(request, obj, form, change)
+    
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        """Customize form fields with advanced input controls"""
+        if db_field.name == "temperature":
+            # Temperature slider with value display
+            kwargs["widget"] = forms.NumberInput(attrs={
+                'type': 'range',
+                'step': '0.1',
+                'min': '0.6', 
+                'max': '1.2',
+                'class': 'temperature-slider slider-with-value',
+                'oninput': 'updateSliderValue(this)',
+                'data-suffix': ' (0.6=focused, 1.2=creative)'
+            })
+        elif db_field.name == "vad_threshold":
+            # VAD threshold slider with value display
+            kwargs["widget"] = forms.NumberInput(attrs={
+                'type': 'range',
+                'step': '0.1',
+                'min': '0.0',
+                'max': '1.0',
+                'class': 'vad-slider slider-with-value',
+                'oninput': 'updateSliderValue(this)',
+                'data-suffix': ' (0.0=sensitive, 1.0=requires loud audio)'
+            })
+        elif db_field.name == "vad_silence_duration_ms":
+            # Silence duration with validation
+            kwargs["widget"] = forms.NumberInput(attrs={
+                'step': '100',
+                'min': '200',
+                'max': '2000',
+                'placeholder': '500ms (recommended)'
+            })
+        elif db_field.name == "max_response_output_tokens":
+            # Max tokens with helpful placeholder
+            kwargs["widget"] = forms.TextInput(attrs={
+                'placeholder': 'inf (unlimited) or number like 500',
+                'size': '30'
+            })
+        elif db_field.name == "instructions":
+            # Larger textarea for instructions
+            kwargs["widget"] = forms.Textarea(attrs={
+                'rows': 4,
+                'cols': 80,
+                'placeholder': 'Describe how the AI agent should behave...'
+            })
+        
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
+    
+    class Media:
+        """Add custom CSS and JavaScript for enhanced admin interface"""
+        css = {
+            'all': ('admin/css/agent_admin.css',)
+        }
+        js = ('admin/js/agent_admin.js', 'admin/js/template_loader.js')
 
 @admin.register(CallSession)
 class CallSessionAdmin(admin.ModelAdmin):

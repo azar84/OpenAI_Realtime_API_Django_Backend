@@ -12,4 +12,5 @@ urlpatterns = [
     path('test/', views.health_check, name='test_endpoint'),  # Simple test
     path('tools/', views.get_tools, name='get_tools'),
     path('public-url/', views.get_public_url, name='get_public_url'),
+    path('template-instructions/', views.get_template_instructions, name='get_template_instructions'),
 ]

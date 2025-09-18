@@ -87,12 +87,51 @@ class PhoneNumber(models.Model):
         # Fallback to user's first active agent
         return self.user.agents.filter(is_active=True).first()
 
+class InstructionTemplate(models.Model):
+    """Templates for agent instructions that can be reused"""
+    name = models.CharField(max_length=100, help_text="Template name (e.g., 'Sales Caller', 'Customer Support')")
+    description = models.TextField(blank=True, help_text="Brief description of what this template is for")
+    instructions = models.TextField(help_text="Template instructions with {name} placeholders")
+    category = models.CharField(
+        max_length=50,
+        choices=[
+            ('sales', 'Sales & Marketing'),
+            ('support', 'Customer Support'),
+            ('assistant', 'General Assistant'),
+            ('custom', 'Custom'),
+        ],
+        default='custom'
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['category', 'name']
+        
+    def __str__(self):
+        return f"{self.name} ({self.get_category_display()})"
+    
+    def get_formatted_instructions(self, agent_name):
+        """Format instructions with the given agent name"""
+        return self.instructions.format(name=agent_name)
+
+
 class AgentConfiguration(models.Model):
     """Configuration for AI agents"""
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='agents')
     name = models.CharField(max_length=100)
+    instruction_template = models.ForeignKey(
+        InstructionTemplate, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        help_text="Select a template for instructions (optional - will use custom instructions if not selected)"
+    )
     instructions = models.TextField(
-        default="You are a helpful AI assistant. You can respond with both text and audio. Keep responses concise and natural."
+        blank=True,
+        default="You are a helpful AI assistant named {name}. You can respond with both text and audio. Keep responses concise and natural.",
+        help_text="Instructions for the AI agent. Use {name} as a placeholder for the agent's name. Select a template above to populate this field, then customize as needed."
     )
     voice = models.CharField(
         max_length=20, 
@@ -110,7 +149,7 @@ class AgentConfiguration(models.Model):
         ],
         default='alloy'
     )
-    temperature = models.FloatField(default=0.8)
+    temperature = models.FloatField(default=0.8, help_text="Temperature for response generation (0.6-1.2)")
     max_response_output_tokens = models.CharField(max_length=10, default="inf")
     
     # Model selection
@@ -193,7 +232,15 @@ class AgentConfiguration(models.Model):
         return f"{self.user.username} - {self.name}"
     
     class Meta:
-        unique_together = ['user', 'name']  # Each user can have unique agent names
+        unique_together = ['user', 'name']
+    
+    def clean(self):
+        """Validate agent configuration fields"""
+        super().clean()
+        
+        # Validate temperature range for OpenAI Realtime API
+        if not (0.6 <= self.temperature <= 1.2):
+            raise ValidationError({'temperature': 'Temperature must be between 0.6 and 1.2 for OpenAI Realtime API'})  # Each user can have unique agent names
     
     def get_user_api_key(self):
         """Get the user's OpenAI API key from their profile, fallback to system default"""
@@ -212,19 +259,33 @@ class AgentConfiguration(models.Model):
         # Fallback to system default
         return settings.OPENAI_API_KEY
     
+    def get_formatted_instructions(self):
+        """Get instructions with agent name substituted"""
+        # Always use the instructions field (which may have been populated from a template)
+        return self.instructions.format(name=self.name)
+    
     def to_openai_config(self):
         """Convert to OpenAI session configuration format"""
         config = {
             "modalities": ["text", "audio"],
-            "instructions": self.instructions,
+            "instructions": self.get_formatted_instructions(),
             "voice": self.voice,
             "input_audio_format": self.input_audio_format,
             "output_audio_format": self.output_audio_format,
             "temperature": self.temperature,
-            "max_response_output_tokens": self.max_response_output_tokens,
             "tools": [],
             "tool_choice": "auto"
         }
+        
+        # Handle max_response_output_tokens properly
+        if self.max_response_output_tokens and self.max_response_output_tokens.lower() != 'inf':
+            try:
+                # Convert to integer if it's a valid number
+                config["max_response_output_tokens"] = int(self.max_response_output_tokens)
+            except ValueError:
+                # If it's not a valid number, omit the field (unlimited)
+                pass
+        # If it's "inf" or empty, omit the field to allow unlimited tokens
         
         # Configure turn detection based on VAD type
         if self.vad_type == 'semantic_vad':
