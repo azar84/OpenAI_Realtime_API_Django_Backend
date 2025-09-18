@@ -110,8 +110,8 @@ class AgentConfiguration(models.Model):
     max_response_output_tokens = models.CharField(max_length=10, default="inf")
     
     # Audio settings
-    input_audio_format = models.CharField(max_length=20, default="pcm16")
-    output_audio_format = models.CharField(max_length=20, default="pcm16")
+    input_audio_format = models.CharField(max_length=20, default="g711_ulaw")
+    output_audio_format = models.CharField(max_length=20, default="g711_ulaw")
     
     # VAD settings
     vad_threshold = models.FloatField(default=0.5)
