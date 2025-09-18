@@ -1,0 +1,47 @@
+{
+  "name": "OpenAI Realtime API Django Backend",
+  "description": "Django backend for connecting Twilio calls to OpenAI Realtime API",
+  "repository": "https://github.com/azar84/OpenAI_Realtime_API_Django_Backend",
+  "keywords": ["django", "openai", "realtime", "twilio", "websocket", "ai", "voice"],
+  "addons": [
+    {
+      "plan": "heroku-postgresql:essential-0"
+    },
+    {
+      "plan": "heroku-redis:essential-0"
+    }
+  ],
+  "env": {
+    "OPENAI_API_KEY": {
+      "description": "OpenAI API key with Realtime API access",
+      "required": true
+    },
+    "TWILIO_ACCOUNT_SID": {
+      "description": "Twilio Account SID",
+      "required": true
+    },
+    "TWILIO_AUTH_TOKEN": {
+      "description": "Twilio Auth Token",
+      "required": true
+    },
+    "SECRET_KEY": {
+      "description": "Django secret key",
+      "generator": "secret"
+    },
+    "DEBUG": {
+      "description": "Django debug mode",
+      "value": "False"
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ]
+}
