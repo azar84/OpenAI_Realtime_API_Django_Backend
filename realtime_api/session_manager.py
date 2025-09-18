@@ -197,9 +197,61 @@ class RealtimeSession:
             logger.info(f"🎯 OpenAI session configured with: voice={config.get('voice', 'default')}, instructions={config.get('instructions', 'default')[:50]}...")
             logger.info("OpenAI session configured successfully")
             
+            # Send initial greeting message after a brief delay to ensure session is ready
+            asyncio.create_task(self.send_delayed_greeting())
+            
         except Exception as e:
             logger.error(f"Error configuring OpenAI session: {e}")
             raise
+    
+    async def send_delayed_greeting(self):
+        """Send greeting after a small delay to ensure session is fully ready"""
+        await asyncio.sleep(1.5)  # Wait 1.5 seconds for session to be fully established
+        await self.send_initial_greeting()
+    
+    async def send_initial_greeting(self):
+        """Send an initial message to prompt the agent to greet the caller"""
+        try:
+            # Check if model connection is still active
+            if not self.is_model_connected():
+                logger.warning("🎤 Model connection not active, skipping initial greeting")
+                return
+            # Get agent name for personalized greeting prompt
+            agent_name = "Assistant"
+            if self.agent_config and self.agent_config.name:
+                agent_name = self.agent_config.name
+            
+            # Create an initial conversation item to trigger the greeting
+            greeting_prompt = {
+                "type": "conversation.item.create",
+                "item": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": f"Hello {agent_name}, the call has just connected. Please greet the caller and start the conversation according to your instructions."
+                        }
+                    ]
+                }
+            }
+            
+            # Send the greeting prompt
+            await self.send_to_model(greeting_prompt)
+            
+            # Create a response to the greeting prompt
+            response_create = {
+                "type": "response.create",
+                "response": {
+                    "modalities": ["text", "audio"]
+                }
+            }
+            
+            await self.send_to_model(response_create)
+            logger.info(f"🎤 Sent initial greeting prompt to {agent_name}")
+            
+        except Exception as e:
+            logger.error(f"Error sending initial greeting: {e}")
     
     async def listen_to_model(self):
         """Listen for responses from OpenAI"""
