@@ -100,9 +100,14 @@ class RealtimeSession:
             
             model_url = f"{settings.OPENAI_REALTIME_URL}?model={settings.OPENAI_REALTIME_MODEL}"
             
+            import ssl
+            # Create SSL context for production
+            ssl_context = ssl.create_default_context()
+            
             self.model_conn = await websockets.connect(
                 model_url,
-                extra_headers=headers
+                extra_headers=headers,
+                ssl=ssl_context
             )
             
             logger.info(f"Connected to OpenAI for session {self.session_id}")

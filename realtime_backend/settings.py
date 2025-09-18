@@ -79,12 +79,20 @@ ASGI_APPLICATION = 'realtime_backend.asgi.application'
 
 # Channels configuration
 # Use Redis for production (Heroku) or InMemory for development
-if os.getenv('REDIS_URL'):
+redis_url = os.getenv('REDIS_URL')
+if redis_url:
+    # Parse Redis URL for Heroku
+    import urllib.parse
+    url = urllib.parse.urlparse(redis_url)
+    
     CHANNEL_LAYERS = {
         'default': {
             'BACKEND': 'channels_redis.core.RedisChannelLayer',
             'CONFIG': {
-                "hosts": [os.getenv('REDIS_URL')],
+                "hosts": [(url.hostname, url.port)],
+                "password": url.password,
+                "capacity": 1500,
+                "expiry": 10,
             },
         },
     }
