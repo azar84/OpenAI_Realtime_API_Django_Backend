@@ -10,6 +10,7 @@ import base64
 from typing import Optional, Dict, Any
 from django.conf import settings
 import logging
+from openai import AsyncOpenAI
 from .conversation_tracker import conversation_tracker
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,13 @@ class RealtimeSession:
                 # Set the saved config from agent configuration
                 self.saved_config = agent_config.to_openai_config()
                 logger.info(f"🎯 Agent config loaded: voice={agent_config.voice}, instructions={agent_config.instructions[:50]}...")
+                
+                # Log MCP integration status
+                if agent_config.has_mcp_integration():
+                    logger.info(f"🔗 MCP integration enabled for agent {agent_config.name} (tenant: {agent_config.mcp_tenant_id})")
+                else:
+                    logger.info(f"🔗 No MCP integration configured for agent {agent_config.name}")
+                    
             except Exception as e:
                 logger.warning(f"🤖 Error loading agent config: {e}")
                 logger.info(f"🤖 Session {session_id} initialized with agent config")
@@ -116,7 +124,14 @@ class RealtimeSession:
         self.response_start_timestamp = None
         
         logger.info(f"Stream started: {self.stream_sid}")
-        await self.try_connect_model()
+        
+        # Use MCP-enabled connection if agent has MCP integration
+        if self.agent_config and self.agent_config.has_mcp_integration():
+            logger.info(f"🔗 Using MCP-enabled connection for agent {self.agent_config.name}")
+            await self.try_connect_model_with_mcp()
+        else:
+            logger.info(f"📡 Using standard connection (no MCP)")
+            await self.try_connect_model()
     
     async def handle_media(self, msg):
         """Handle Twilio media (audio) data"""
@@ -139,6 +154,27 @@ class RealtimeSession:
         logger.info(f"Stream stopped: {self.stream_sid}")
         await self.cleanup_all_connections()
     
+    async def try_connect_model_with_mcp(self):
+        """Connect to OpenAI Realtime API using official client with MCP support"""
+        if not self.twilio_conn or not self.stream_sid or not self.openai_api_key:
+            logger.warning("Cannot connect to model: missing requirements")
+            return
+            
+        if self.is_model_connected():
+            logger.info("Model already connected")
+            return
+        
+        try:
+            # For now, fall back to standard connection but with enhanced MCP logging
+            logger.info(f"🔗 Using enhanced connection with MCP support for agent {self.agent_config.name}")
+            
+            # Use the standard connection method but ensure MCP tools are added
+            await self.try_connect_model()
+            
+        except Exception as e:
+            logger.error(f"Failed to connect to OpenAI with MCP: {e}")
+            self.model_conn = None
+
     async def try_connect_model(self):
         """Connect to OpenAI Realtime API"""
         if not self.twilio_conn or not self.stream_sid or not self.openai_api_key:
@@ -186,6 +222,123 @@ class RealtimeSession:
             logger.error(f"Failed to connect to OpenAI: {e}")
             self.model_conn = None
     
+    async def configure_session_with_mcp(self):
+        """Configure session using official AsyncOpenAI client with MCP support"""
+        try:
+            # Get base configuration
+            if self.agent_config and self.saved_config:
+                config = self.saved_config.copy()
+                # Override audio formats for Twilio compatibility
+                config["input_audio_format"] = "g711_ulaw"
+                config["output_audio_format"] = "g711_ulaw"
+                logger.info(f"🎯 Using agent config with Twilio audio formats")
+            else:
+                config = {
+                    "modalities": ["text", "audio"],
+                    "turn_detection": {"type": "server_vad"},
+                    "voice": "alloy",
+                    "input_audio_transcription": {"model": "whisper-1"},
+                    "input_audio_format": "g711_ulaw",
+                    "output_audio_format": "g711_ulaw",
+                    "tools": []
+                }
+                logger.info(f"🎯 Using default config with Twilio audio formats")
+            
+            # Add MCP tools if agent has MCP integration
+            if self.agent_config and self.agent_config.has_mcp_integration():
+                from django.conf import settings
+                mcp_headers = self.agent_config.get_mcp_headers()
+                
+                mcp_tool = {
+                    "type": "mcp",
+                    "server_label": f"mcp-{self.agent_config.mcp_tenant_id}",
+                    "server_url": settings.MCP_SERVER_URL,
+                    "authorization": self.agent_config.mcp_auth_token,  # Just the token, OpenAI will add Bearer
+                    "require_approval": "never"
+                }
+                config["tools"].append(mcp_tool)
+                logger.info(f"🔗 Added MCP tool: {mcp_tool['server_label']} -> {mcp_tool['server_url']}")
+            
+            # Use official client session.update method
+            await self.model_conn.session.update(session=config)
+            logger.info(f"🎯 OpenAI session configured with official client")
+            logger.info("OpenAI session configured successfully")
+            
+            # Send initial greeting message after a brief delay
+            asyncio.create_task(self.send_delayed_greeting())
+            
+        except Exception as e:
+            logger.error(f"Error configuring session with MCP: {e}")
+
+    async def listen_to_model_with_mcp(self):
+        """Listen to OpenAI model responses using official client with MCP support"""
+        try:
+            async for event in self.model_conn:
+                event_type = getattr(event, "type", None)
+                
+                if event_type == "error":
+                    error_info = getattr(event, "error", None)
+                    logger.error(f"OpenAI MCP error: {error_info}")
+                    
+                    # Track error event
+                    if self.conversation:
+                        await conversation_tracker.track_event(
+                            self.conversation,
+                            event_type,
+                            {},
+                            error=str(error_info)
+                        )
+                
+                elif event_type == "response.completed":
+                    logger.info(f"Response completed with MCP support")
+                
+                # Handle MCP-specific events
+                elif event_type and "mcp" in event_type:
+                    logger.info(f"🔗 MCP Event: {event_type}")
+                    
+                    # Track MCP event
+                    if self.conversation:
+                        event_data = {}
+                        if hasattr(event, 'payload'):
+                            event_data = event.payload
+                        elif hasattr(event, '__dict__'):
+                            event_data = {k: v for k, v in event.__dict__.items() if not k.startswith('_')}
+                        
+                        await conversation_tracker.track_event(
+                            self.conversation,
+                            event_type,
+                            event_data
+                        )
+                
+                # Handle other events as before
+                else:
+                    # Convert event to our standard format and process
+                    await self.handle_model_message_from_event(event)
+                    
+        except Exception as e:
+            logger.error(f"Error listening to OpenAI with MCP: {e}")
+
+    async def handle_model_message_from_event(self, event):
+        """Convert official client event to our standard message format"""
+        try:
+            # Convert event object to dictionary format
+            event_dict = {
+                "type": getattr(event, "type", None)
+            }
+            
+            # Add other attributes from the event
+            for attr in dir(event):
+                if not attr.startswith('_') and attr != 'type':
+                    value = getattr(event, attr, None)
+                    if value is not None and not callable(value):
+                        event_dict[attr] = value
+            
+            # Process using existing handler
+            await self.handle_model_message(json.dumps(event_dict))
+            
+        except Exception as e:
+            logger.error(f"Error converting event to message: {e}")
+
     async def configure_session(self):
         """Configure the OpenAI session"""
         try:
@@ -206,6 +359,21 @@ class RealtimeSession:
                     "output_audio_format": "g711_ulaw", # Twilio format
                 }
                 logger.info(f"🎯 Using default config with Twilio audio formats")
+            
+            # Add MCP tools if agent has MCP integration
+            if self.agent_config and self.agent_config.has_mcp_integration():
+                from django.conf import settings
+                mcp_headers = self.agent_config.get_mcp_headers()
+                
+                mcp_tool = {
+                    "type": "mcp",
+                    "server_label": f"mcp-{self.agent_config.mcp_tenant_id}",
+                    "server_url": settings.MCP_SERVER_URL,
+                    "authorization": self.agent_config.mcp_auth_token,  # Just the token, OpenAI will add Bearer
+                    "require_approval": "never"
+                }
+                config["tools"].append(mcp_tool)
+                logger.info(f"🔗 Added MCP tool: {mcp_tool['server_label']} -> {mcp_tool['server_url']}")
             
             session_config = {
                 "type": "session.update",

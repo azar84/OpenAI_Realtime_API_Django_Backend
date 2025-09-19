@@ -170,6 +170,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # OpenAI Configuration
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
+# MCP (Model Context Protocol) Server Configuration
+MCP_SERVER_URL = os.getenv('MCP_SERVER_URL', 'https://your-ngrok.ngrok-free.app/api/mcp/')
+
 # Twilio Configuration
 TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID')
 TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN')

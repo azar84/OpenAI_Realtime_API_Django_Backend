@@ -287,9 +287,34 @@ class AgentConfiguration(models.Model):
             }
         return None
     
+    def get_mcp_server_config(self):
+        """Get MCP server configuration for client-side RealtimeAgent"""
+        if self.has_mcp_integration():
+            from django.conf import settings
+            return {
+                "url": settings.MCP_SERVER_URL,
+                "headers": self.get_mcp_headers(),
+                "label": f"mcp-{self.mcp_tenant_id}"
+            }
+        return None
+    
     def has_mcp_integration(self):
         """Check if this agent has MCP server integration configured"""
         return bool(self.mcp_tenant_id and self.mcp_auth_token)
+    
+    def get_mcp_headers(self):
+        """Get MCP server headers for authentication"""
+        if self.has_mcp_integration():
+            # Check if token already has 'Bearer ' prefix
+            auth_value = self.mcp_auth_token
+            if not auth_value.startswith('Bearer '):
+                auth_value = f'Bearer {auth_value}'
+            
+            return {
+                'Authorization': auth_value,
+                'Content-Type': 'application/json'
+            }
+        return None
     
     def to_openai_config(self):
         """Convert to OpenAI session configuration format"""
@@ -336,6 +361,10 @@ class AgentConfiguration(models.Model):
             config["input_audio_transcription"] = {
                 "model": self.transcription_model
             }
+        
+        # Note: MCP servers are handled separately from OpenAI session config
+        # The mcpServers parameter is not part of OpenAI's Realtime API session config
+        # MCP integration should be handled at the client level, not in the session config
             
         return config
 

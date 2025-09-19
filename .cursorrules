@@ -143,3 +143,6 @@ web: daphne realtime_backend.asgi:application --port $PORT --bind 0.0.0.0 -v2
 3. Configure Twilio webhook with ngrok HTTPS URL
 4. Add phone numbers in admin with correct Twilio SIDs
 5. Test routing with curl or real phone calls
+
+#Commiting Changes to Guthub 
+1. Never commit any changes to github without user ask you to do so
