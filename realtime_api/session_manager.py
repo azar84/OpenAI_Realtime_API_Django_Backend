@@ -66,11 +66,28 @@ class RealtimeSession:
         self.openai_api_key = self._get_openai_api_key()
         if agent_config:
             self.saved_config = agent_config.to_openai_config()
+            # Log MCP integration status
+            if agent_config.has_mcp_integration():
+                logger.info(f"🔗 MCP integration enabled for agent {agent_config.name} (tenant: {agent_config.mcp_tenant_id})")
+            else:
+                logger.info(f"🔗 No MCP integration configured for agent {agent_config.name}")
         
     def set_twilio_connection(self, consumer):
         """Set the Django Channels consumer as Twilio connection"""
         self.twilio_conn = consumer
         logger.info(f"Twilio connection established for session {self.session_id}")
+    
+    def get_mcp_config(self):
+        """Get MCP server configuration for this session's agent"""
+        if self.agent_config:
+            return self.agent_config.get_mcp_config()
+        return None
+    
+    def has_mcp_integration(self):
+        """Check if this session has MCP server integration available"""
+        if self.agent_config:
+            return self.agent_config.has_mcp_integration()
+        return False
     
     async def handle_twilio_message(self, data):
         """Handle messages from Twilio WebSocket"""

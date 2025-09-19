@@ -173,6 +173,11 @@ class AgentConfigurationAdmin(admin.ModelAdmin):
         ('Transcription', {
             'fields': ('enable_input_transcription', 'transcription_model')
         }),
+        ('MCP Server Integration', {
+            'fields': ('mcp_tenant_id', 'mcp_auth_token'),
+            'description': 'Configure Model Context Protocol (MCP) server connection for enhanced capabilities',
+            'classes': ('collapse',)
+        }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',)
@@ -243,6 +248,19 @@ class AgentConfigurationAdmin(admin.ModelAdmin):
                 'rows': 4,
                 'cols': 80,
                 'placeholder': 'Describe how the AI agent should behave...'
+            })
+        elif db_field.name == "mcp_tenant_id":
+            # MCP Tenant ID with helpful placeholder
+            kwargs["widget"] = forms.TextInput(attrs={
+                'placeholder': 'e.g., tenant-abc123 (optional)',
+                'size': '40'
+            })
+        elif db_field.name == "mcp_auth_token":
+            # MCP Auth Token as password field for security
+            kwargs["widget"] = forms.PasswordInput(attrs={
+                'placeholder': 'MCP server authentication token (optional)',
+                'size': '50',
+                'render_value': True  # Show existing value when editing
             })
         
         return super().formfield_for_dbfield(db_field, request, **kwargs)

@@ -224,6 +224,20 @@ class AgentConfiguration(models.Model):
         help_text="Choose the transcription model for speech-to-text"
     )
     
+    # MCP (Model Context Protocol) Server Integration
+    mcp_tenant_id = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="Tenant ID for MCP server authentication (optional)"
+    )
+    mcp_auth_token = models.CharField(
+        max_length=500,
+        blank=True,
+        null=True,
+        help_text="Authentication token for MCP server (optional, will be encrypted)"
+    )
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
@@ -263,6 +277,19 @@ class AgentConfiguration(models.Model):
         """Get instructions with agent name substituted"""
         # Always use the instructions field (which may have been populated from a template)
         return self.instructions.format(name=self.name)
+    
+    def get_mcp_config(self):
+        """Get MCP server configuration if available"""
+        if self.mcp_tenant_id and self.mcp_auth_token:
+            return {
+                "tenant_id": self.mcp_tenant_id,
+                "auth_token": self.mcp_auth_token
+            }
+        return None
+    
+    def has_mcp_integration(self):
+        """Check if this agent has MCP server integration configured"""
+        return bool(self.mcp_tenant_id and self.mcp_auth_token)
     
     def to_openai_config(self):
         """Convert to OpenAI session configuration format"""
