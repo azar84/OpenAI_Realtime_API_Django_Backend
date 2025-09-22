@@ -60,7 +60,7 @@ class TurnBuilder:
             completed_at=timezone.now()
         )
         
-        logger.info(f"🤖 Finalized assistant turn: {complete_text[:50]}...")
+        logger.info(f"🤖 AI: {complete_text[:100]}{'...' if len(complete_text) > 100 else ''}")
         return turn
 
     @sync_to_async
@@ -85,7 +85,7 @@ class TurnBuilder:
             completed_at=timezone.now()
         )
         
-        logger.info(f"👤 Finalized user turn: {complete_text[:50]}...")
+        logger.info(f"👤 USER: {complete_text[:100]}{'...' if len(complete_text) > 100 else ''}")
         return turn
 
     @sync_to_async
@@ -133,7 +133,7 @@ class ConversationTracker:
         )
         
         if created:
-            logger.info(f"📝 Created new conversation {conversation.id} for session {call_session.session_id[:8]}...")
+            logger.info(f"📝 New conversation started (ID: {conversation.id})")
         
         return conversation
 
@@ -239,7 +239,15 @@ class ConversationTracker:
                 if item_id:
                     await self.turn_builder.create_error_turn(conversation, item_id, error_message)
             
-            logger.debug(f"📝 Processed event: {event_type}")
+            # Only log important events, not every delta
+            if event_type in [
+                "conversation.item.input_audio_transcription.completed",
+                "response.output_text.done", 
+                "response.done", 
+                "response.completed",
+                "conversation.item.input_audio_transcription.failed"
+            ]:
+                logger.debug(f"📝 Processed event: {event_type}")
             
         except Exception as e:
             logger.error(f"Error handling realtime event {event_type}: {e}")
