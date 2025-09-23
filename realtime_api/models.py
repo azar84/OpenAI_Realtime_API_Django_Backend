@@ -238,6 +238,13 @@ class AgentConfiguration(models.Model):
         help_text="Authentication token for MCP server (optional, will be encrypted)"
     )
     
+    # Agent timezone for baseline instructions
+    agent_timezone = models.CharField(
+        max_length=50,
+        default="UTC",
+        help_text="Agent's timezone for time awareness (e.g., 'America/New_York', 'Europe/London', 'UTC')"
+    )
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)

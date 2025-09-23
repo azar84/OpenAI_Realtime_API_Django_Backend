@@ -29,9 +29,6 @@ async def get_weather(location: str) -> Dict[str, Any]:
     Returns:
         Dict containing weather information
     """
-    logger.info(f"🌤️ WEATHER TOOL: Starting weather lookup for: {location}")
-    logger.info(f"🌤️ WEATHER TOOL: Input validation - location type: {type(location)}")
-    
     # Mock weather data - replace with real API call
     weather_data = {
         "location": location,
@@ -42,8 +39,6 @@ async def get_weather(location: str) -> Dict[str, Any]:
         "description": f"It's a beautiful sunny day in {location} with comfortable temperatures."
     }
     
-    logger.info(f"🌤️ WEATHER TOOL: Weather data generated successfully")
-    logger.info(f"🌤️ WEATHER TOOL: Returning data: {json.dumps(weather_data, indent=2)}")
     return weather_data
 
 
@@ -88,11 +83,7 @@ async def get_current_time(timezone: Optional[str] = None) -> Dict[str, Any]:
     Returns:
         Dict containing current time information
     """
-    logger.info(f"🕐 TIME TOOL: Starting time lookup for timezone: {timezone or 'UTC'}")
-    logger.info(f"🕐 TIME TOOL: Input validation - timezone type: {type(timezone)}")
-    
     now = datetime.now()
-    logger.info(f"🕐 TIME TOOL: Current datetime object: {now}")
     
     time_data = {
         "current_time": now.strftime("%Y-%m-%d %H:%M:%S"),
@@ -104,8 +95,6 @@ async def get_current_time(timezone: Optional[str] = None) -> Dict[str, Any]:
         "month": now.strftime("%B")
     }
     
-    logger.info(f"🕐 TIME TOOL: Time data generated successfully")
-    logger.info(f"🕐 TIME TOOL: Returning data: {json.dumps(time_data, indent=2)}")
     return time_data
 
 
@@ -141,10 +130,6 @@ async def calculate_math(expression: str) -> Dict[str, Any]:
     Returns:
         Dict containing calculation result
     """
-    logger.info(f"🔢 MATH TOOL: Starting calculation for expression: {expression}")
-    logger.info(f"🔢 MATH TOOL: Input validation - expression type: {type(expression)}")
-    logger.info(f"🔢 MATH TOOL: Expression length: {len(expression)} characters")
-    
     try:
         # Simple and safe evaluation for basic math
         # Only allow basic operators and numbers
@@ -152,30 +137,19 @@ async def calculate_math(expression: str) -> Dict[str, Any]:
         if not all(c in allowed_chars for c in expression):
             raise ValueError("Invalid characters in expression")
         
-        logger.info(f"🔢 MATH TOOL: Expression passed validation, evaluating...")
         result = eval(expression)
-        logger.info(f"🔢 MATH TOOL: Evaluation successful, result: {result}")
         
-        response_data = {
+        return {
             "expression": expression,
             "result": result,
             "formatted_result": f"{expression} = {result}"
         }
-        
-        logger.info(f"🔢 MATH TOOL: Returning calculation result: {json.dumps(response_data, indent=2)}")
-        return response_data
     except Exception as e:
-        logger.error(f"🔢 MATH TOOL: Calculation error: {e}")
-        logger.error(f"🔢 MATH TOOL: Exception type: {type(e).__name__}")
-        
-        error_response = {
+        return {
             "expression": expression,
             "error": f"Could not calculate: {str(e)}",
             "result": None
         }
-        
-        logger.info(f"🔢 MATH TOOL: Returning error response: {json.dumps(error_response, indent=2)}")
-        return error_response
 
 
 # =============================================================================
@@ -273,35 +247,19 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, A
     Returns:
         Dict containing the tool execution result
     """
-    logger.info(f"🔧 TOOL EXECUTION: Starting execution of tool: {tool_name}")
-    logger.info(f"🔧 TOOL EXECUTION: Arguments received: {json.dumps(arguments, indent=2)}")
-    logger.info(f"🔧 TOOL EXECUTION: Tool registry contains: {list(TOOL_REGISTRY.keys())}")
-    
     if tool_name not in TOOL_REGISTRY:
         error_msg = f"Unknown tool: {tool_name}"
         logger.error(f"🔧 TOOL EXECUTION: {error_msg}")
-        logger.error(f"🔧 TOOL EXECUTION: Available tools: {list(TOOL_REGISTRY.keys())}")
         return {"error": error_msg}
     
     try:
         tool_function = TOOL_REGISTRY[tool_name]["function"]
-        tool_description = TOOL_REGISTRY[tool_name]["description"]
-        logger.info(f"🔧 TOOL EXECUTION: Found tool function: {tool_function.__name__}")
-        logger.info(f"🔧 TOOL EXECUTION: Tool description: {tool_description}")
-        logger.info(f"🔧 TOOL EXECUTION: Calling tool function with arguments...")
-        
         result = await tool_function(**arguments)
-        
-        logger.info(f"🔧 TOOL EXECUTION: Tool {tool_name} executed successfully")
-        logger.info(f"🔧 TOOL EXECUTION: Result type: {type(result)}")
-        logger.info(f"🔧 TOOL EXECUTION: Result preview: {str(result)[:200]}{'...' if len(str(result)) > 200 else ''}")
-        
+        logger.info(f"🔧 TOOL EXECUTION: {tool_name} completed")
         return result
     except Exception as e:
         error_msg = f"Error executing tool {tool_name}: {str(e)}"
         logger.error(f"🔧 TOOL EXECUTION: {error_msg}")
-        logger.error(f"🔧 TOOL EXECUTION: Exception type: {type(e).__name__}")
-        logger.error(f"🔧 TOOL EXECUTION: Full traceback: {str(e)}")
         return {"error": error_msg}
 
 

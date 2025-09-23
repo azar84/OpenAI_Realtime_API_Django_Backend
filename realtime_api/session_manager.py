@@ -237,8 +237,9 @@ class SessionConfiguration:
         config["input_audio_format"] = "g711_ulaw"
         config["output_audio_format"] = "g711_ulaw"
         
-        # Add tool handling instructions
-        self._add_tool_instructions(config)
+        # Add tool handling instructions with agent timezone
+        agent_timezone = getattr(self.agent_config, 'agent_timezone', 'UTC') if self.agent_config else 'UTC'
+        self._add_tool_instructions(config, agent_timezone)
         
         # Ensure tool_choice is set to auto
         config["tool_choice"] = "auto"
@@ -254,18 +255,38 @@ class SessionConfiguration:
             "input_audio_transcription": {"model": "whisper-1"},
         }
     
-    def _add_tool_instructions(self, config: Dict[str, Any]) -> None:
+    def _add_tool_instructions(self, config: Dict[str, Any], agent_timezone: str = "UTC") -> None:
         """Add tool handling instructions to session config"""
-        tool_instructions = (
-            "After any tool call, briefly explain the result to the caller and offer a "
-            "follow-up question or next step. Do not wait for the user to ask what happened. "
-            "Always speak the tool results out loud."
-        )
+        # Baseline mandatory instructions for all voice agents
+        baseline_instructions = f"""📌 Baseline Mandatory Instructions for you to follow:
+The initil message you receive is just to put you on the context , not for sharing with the user. 
+This include the time zone, don't tell the user youare operatin in this time zone,keepthis for yoursel when you need it.  
+You are connected to an MCP server with tools and tenant-scoped resources (documents, KBs, APIs).
+Don't assume your time zone is the same as the user's time zone when you plan to use meeting scheduling or availability tools.
+You are operating in the {agent_timezone} timezone - use this for all time-related references and awareness.
+Always check KB/resources first before saying you don't know. Only after confirming no relevant resource is available may you say you don't know.
+Use tools naturally — do not explain the tool itself to the user, only use the result in your answer.
+Keep responses natural & concise — speak like a human, not like a script.
+Acknowledge the user's input before answering (e.g., "Good question, let me check…").
+Avoid hallucinations — never invent details that are not available in KBs or resources.
+Respect user interruptions — stop speaking immediately when interrupted and listen.
+Maintain session memory — remain consistent with facts mentioned earlier in the conversation.
+Stay polite & professional — no slang unless explicitly configured.
+Use filler words moderately if your personality config allows (e.g., "Well," "Let's see…").
+If a tool call fails, retry once. If it still fails, acknowledge gracefully and continue.
+Never expose raw tool call details, API responses, or error messages to the user.
+If you are going to use the meeting booking tools please refrin from reading the meeting link to the user, just tell them that the meeting is booked in 
+a professional way and that they will receive confoirmation via email. 
+When you collect user email spell it out back to the user for the part before the "@" sign., this is to confirm  email is correct , spell it charecter by 
+charecter, don't tell the user you are reading the part before the "@" , just tell them you need to conform the email is correct.
+If the part after the "@" is not a common email doain like google , yahoo etc.. , spell out the part after "@" sign too. 
+
+After any tool call, briefly explain the result to the caller and offer a follow-up question or next step. Do not wait for the user to ask what happened. Always speak the tool results out loud."""
         
         if "instructions" in config:
-            config["instructions"] += f"\n\nIMPORTANT: {tool_instructions}"
+            config["instructions"] = f"{baseline_instructions}\n\n{config['instructions']}"
         else:
-            config["instructions"] = tool_instructions
+            config["instructions"] = baseline_instructions
 
 
 class RealtimeSession:
@@ -538,6 +559,9 @@ class RealtimeSession:
             if self.agent_config and self.agent_config.name:
                 agent_name = self.agent_config.name
             
+            # Get agent timezone for initial message
+            agent_timezone = getattr(self.agent_config, 'agent_timezone', 'UTC') if self.agent_config else 'UTC'
+            
             # Create an initial conversation item to trigger the greeting
             greeting_prompt = {
                 "type": "conversation.item.create",
@@ -547,7 +571,7 @@ class RealtimeSession:
                     "content": [
                         {
                             "type": "input_text",
-                            "text": f"Hello {agent_name}, the call has just connected. Please greet the caller and start the conversation according to your instructions."
+                            "text": f"Hello {agent_name}, the call has just connected. You are operating in the {agent_timezone} timezone. Please greet the caller and start the conversation according to your instructions."
                         }
                     ]
                 }
@@ -598,19 +622,14 @@ class RealtimeSession:
             event = json.loads(data)
             event_type = event.get('type')
             
-            # Enhanced debugging for ALL events to see what we're receiving
-            logger.debug(f"📡 RECEIVED EVENT: {event_type}")
-            if event_type in ['response.function_call_arguments.delta', 'response.function_call_arguments.done', 'response.output_item.done']:
-                logger.info(f"🔧 TOOL EVENT DEBUG: {event_type} - {json.dumps(event, indent=2)}")
-            
-            # Log any event that might be related to function calls
-            if event_type and ('function' in event_type.lower() or 'call' in event_type.lower()):
-                logger.info(f"🔧 FUNCTION EVENT: {event_type} - {json.dumps(event, indent=2)}")
-            
-            # Enhanced debugging for MCP and tool-related events
-            if event_type and ('mcp' in event_type.lower() or 'tool' in event_type.lower() or 'function' in event_type.lower()):
-                logger.info(f"🔗 MCP EVENT: Received {event_type} from OpenAI")
-                logger.info(f"🔗 MCP EVENT: Event data: {json.dumps(event, indent=2)}")
+            # Log important MCP and tool events
+            if event_type and ('mcp' in event_type.lower() or 'function' in event_type.lower() or 'tool' in event_type.lower()):
+                if event_type in ['response.mcp_call_arguments.done', 'response.mcp_call.completed', 'response.function_call_arguments.done', 'conversation.item.create']:
+                    logger.info(f"🔗 MCP/TOOL EVENT: {event_type}")
+                elif event_type in ['response.mcp_call_arguments.delta', 'response.function_call_arguments.delta']:
+                    logger.debug(f"🔗 MCP/TOOL STREAMING: {event_type}")
+                else:
+                    logger.info(f"🔗 MCP/TOOL EVENT: {event_type}")
             
             # Track all events for conversation history
             if self.conversation:
@@ -625,31 +644,26 @@ class RealtimeSession:
                 call_id = event.get('call_id')
                 name = event.get('name')
                 chunk = event.get('delta', '')
-                logger.info(f"🔧 TOOL CALL: Delta received - call_id={call_id}, name={name}, chunk='{chunk}'")
                 if call_id:
                     buf = self._fn_arg_buffers.setdefault(call_id, {"name": name, "args": []})
                     if name and not buf.get("name"):
                         buf["name"] = name
                     buf["args"].append(chunk)
-                    logger.info(f"🔧 TOOL CALL: Buffering args for {call_id}: '{chunk}' (total chunks: {len(buf['args'])})")
                 else:
-                    logger.warning(f"🔧 TOOL CALL: No call_id in delta event: {event}")
+                    logger.warning(f"🔧 TOOL CALL: No call_id in delta event")
             elif event_type == 'response.function_call_arguments.done':
                 # Function call arguments are complete - execute the tool
                 call_id = event.get('call_id')
-                logger.info(f"🔧 TOOL CALL: Done event received - call_id={call_id}")
-                logger.info(f"🔧 TOOL CALL: Available buffers: {list(self._fn_arg_buffers.keys())}")
                 
                 if not call_id or call_id not in self._fn_arg_buffers:
                     logger.warning(f"🔧 TOOL CALL: No buffer found for call_id {call_id}")
-                    logger.warning(f"🔧 TOOL CALL: Available call_ids: {list(self._fn_arg_buffers.keys())}")
                     return
                 
                 name = self._fn_arg_buffers[call_id]["name"] or event.get('name') or ''
                 raw_args = ''.join(self._fn_arg_buffers[call_id]["args"])  # JSON text
                 
-                logger.info(f"🔧 TOOL CALL: Function call complete - {name} with args: {raw_args}")
-                logger.info(f"🔧 TOOL CALL: Buffer details: {self._fn_arg_buffers[call_id]}")
+                logger.info(f"🔧 TOOL CALL: Executing {name} with args: {raw_args}")
+                logger.info(f"🔧 TOOL CALL: Tool execution started for {name}")
                 
                 # Clean up buffer early to avoid leaks
                 del self._fn_arg_buffers[call_id]
@@ -660,24 +674,19 @@ class RealtimeSession:
                 # Buffer MCP call arguments as they stream in
                 item_id = event.get('item_id')
                 chunk = event.get('delta', '')
-                logger.info(f"🔗 MCP TOOL CALL: Delta received - item_id={item_id}, chunk='{chunk}'")
                 if item_id:
                     buf = self._fn_arg_buffers.setdefault(item_id, {"name": "mcp_call", "args": []})
                     buf["args"].append(chunk)
-                    logger.info(f"🔗 MCP TOOL CALL: Buffering args for {item_id}: '{chunk}' (total chunks: {len(buf['args'])})")
                 else:
-                    logger.warning(f"🔗 MCP TOOL CALL: No item_id in delta event: {event}")
+                    logger.warning(f"🔗 MCP TOOL CALL: No item_id in delta event")
             elif event_type == 'response.mcp_call_arguments.done':
                 # MCP call arguments are complete - execute the tool
                 item_id = event.get('item_id')
                 arguments = event.get('arguments', '{}')
-                logger.info(f"🔗 MCP TOOL CALL: Done event received - item_id={item_id}")
-                logger.info(f"🔗 MCP TOOL CALL: Arguments from event: {arguments}")
                 
                 # Get the buffered arguments if available
                 if item_id and item_id in self._fn_arg_buffers:
                     raw_args = ''.join(self._fn_arg_buffers[item_id]["args"])
-                    logger.info(f"🔗 MCP TOOL CALL: Buffered arguments: {raw_args}")
                     del self._fn_arg_buffers[item_id]
                 else:
                     raw_args = arguments
@@ -686,18 +695,19 @@ class RealtimeSession:
                 # Store the arguments for when the call completes
                 self._mcp_pending_calls = getattr(self, '_mcp_pending_calls', {})
                 self._mcp_pending_calls[item_id] = raw_args
-                logger.info(f"🔗 MCP TOOL CALL: Stored pending MCP call {item_id} with args: {raw_args}")
+                logger.info(f"🔗 MCP TOOL CALL: MCP call ready - {item_id}")
+                logger.info(f"🔗 MCP TOOL CALL: Waiting for MCP server to process call")
             elif event_type == 'response.mcp_call.completed':
                 # MCP call completed - now we can handle the result
                 item_id = event.get('item_id')
-                logger.info(f"🔗 MCP TOOL CALL: MCP call completed - item_id={item_id}")
                 
                 # Get the stored arguments
                 self._mcp_pending_calls = getattr(self, '_mcp_pending_calls', {})
                 if item_id in self._mcp_pending_calls:
                     raw_args = self._mcp_pending_calls[item_id]
                     del self._mcp_pending_calls[item_id]
-                    logger.info(f"🔗 MCP TOOL CALL: Processing completed MCP call {item_id} with args: {raw_args}")
+                    logger.info(f"🔗 MCP TOOL CALL: MCP call completed - {item_id}")
+                    logger.info(f"🔗 MCP TOOL CALL: MCP server processed call successfully")
                     
                     # For MCP calls, we don't need to execute tools - the MCP server handles it
                     # We just need to trigger a response to speak the result
@@ -718,9 +728,7 @@ class RealtimeSession:
                 # Check if this is a tool call item
                 item = event.get('item', {})
                 if item.get('type') == 'function_call':
-                    logger.info(f"🔧 TOOL EVENT: Function call item created")
-                    logger.info(f"🔧 TOOL EVENT: Function: {item.get('name', 'Unknown')}")
-                    logger.info(f"🔧 TOOL EVENT: Arguments: {item.get('arguments', '{}')}")
+                    logger.info(f"🔧 TOOL EVENT: Function call - {item.get('name', 'Unknown')}")
                 
         except json.JSONDecodeError:
             logger.error(f"Invalid JSON from OpenAI: {data}")
@@ -729,8 +737,6 @@ class RealtimeSession:
     
     async def _handle_mcp_call_completion(self, item_id: str, arguments_json: str) -> None:
         """Handle MCP call completion - trigger response to speak the result"""
-        logger.info(f"🔗 MCP TOOL CALL: MCP call completed - triggering response to speak result")
-        
         # Send a response to make the agent speak about the MCP result
         await self.send_to_model({
             "type": "response.create",
@@ -742,13 +748,13 @@ class RealtimeSession:
                 )
             }
         })
-        logger.info(f"🔗 MCP TOOL CALL: Response generation triggered for MCP result")
+        logger.info(f"🔗 MCP TOOL CALL: Response triggered for MCP result")
 
     async def _handle_function_call_from_args(self, function_name: str, arguments_json: str, call_id: str) -> None:
         """Handle function call execution from streamed arguments (recommended approach)"""
         from .tools import execute_tool
         
-        logger.info(f"🔧 TOOL CALL: (streamed) {function_name} | call_id={call_id} | args={arguments_json}")
+        logger.info(f"🔧 TOOL CALL: Executing {function_name}")
 
         # Send a quick "holding" response without injecting an assistant message item
         await self.send_to_model({
@@ -758,22 +764,18 @@ class RealtimeSession:
                 "instructions": "One moment while I check that for you..."
             }
         })
-        logger.info(f"🔧 TOOL CALL: Sent holding response to avoid dead air")
 
         try:
             # Parse arguments with error handling
             try:
                 args = json.loads(arguments_json or "{}")
-                logger.info(f"🔧 TOOL CALL: Parsed arguments: {args}")
             except json.JSONDecodeError as e:
                 logger.warning(f"🔧 TOOL CALL: Invalid JSON arguments, using empty dict: {e}")
                 args = {}
             
             # Execute the tool
-            logger.info(f"🔧 TOOL CALL: Executing tool {function_name}...")
             result = await execute_tool(function_name, args)
-            logger.info(f"🔧 TOOL CALL: Tool execution completed")
-            logger.info(f"🔧 TOOL CALL: Result: {json.dumps(result, indent=2) if isinstance(result, dict) else str(result)}")
+            logger.info(f"🔧 TOOL CALL: Tool completed - {function_name}")
 
             # Step 1: Attach tool result to conversation
             await self.send_to_model({
@@ -784,7 +786,6 @@ class RealtimeSession:
                     "output": json.dumps(result) if not isinstance(result, str) else result
                 }
             })
-            logger.info(f"🔧 TOOL CALL: Step 1 - Tool result attached to conversation")
 
             # Step 2: Explicitly ask the model to speak about it
             await self.send_to_model({
@@ -797,12 +798,10 @@ class RealtimeSession:
                     )
                 }
             })
-            logger.info(f"🔧 TOOL CALL: Step 2 - Response generation triggered with audio")
-            logger.info(f"🔧 TOOL CALL: Agent will now speak the tool result to the caller")
+            logger.info(f"🔧 TOOL CALL: Response triggered for {function_name}")
 
         except Exception as e:
-            logger.error(f"🔧 TOOL CALL: Error handling function call {function_name}: {e}")
-            logger.error(f"🔧 TOOL CALL: Call ID: {call_id}, Arguments: {arguments_json}")
+            logger.error(f"🔧 TOOL CALL: Error executing {function_name}: {e}")
 
     async def handle_output_item_done(self, event: Dict[str, Any]) -> None:
         """Handle completed output items (fallback for non-function-call items)"""

@@ -178,6 +178,10 @@ class AgentConfigurationAdmin(admin.ModelAdmin):
             'description': 'Configure Model Context Protocol (MCP) server connection for enhanced capabilities',
             'classes': ('collapse',)
         }),
+        ('Agent Settings', {
+            'fields': ('agent_timezone',),
+            'description': 'Agent timezone for time awareness in conversations'
+        }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',)
@@ -261,6 +265,13 @@ class AgentConfigurationAdmin(admin.ModelAdmin):
                 'placeholder': 'MCP server authentication token (optional)',
                 'size': '50',
                 'render_value': True  # Show existing value when editing
+            })
+        elif db_field.name == "agent_timezone":
+            # Timezone field with helpful placeholder and common timezones
+            kwargs["widget"] = forms.TextInput(attrs={
+                'placeholder': 'e.g., America/New_York, Europe/London, UTC',
+                'size': '40',
+                'list': 'timezone-suggestions'
             })
         
         return super().formfield_for_dbfield(db_field, request, **kwargs)
