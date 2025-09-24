@@ -48,6 +48,10 @@ class RealtimeConsumer(AsyncWebsocketConsumer):
         # Set this consumer as the Twilio connection
         self.realtime_session.set_twilio_connection(self)
         
+        # Start idle timeout tracking
+        if self.realtime_session:
+            self.realtime_session.update_activity()
+        
         logger.info("Session initialized, ready for Twilio messages")
         
     async def disconnect(self, close_code):
@@ -195,6 +199,10 @@ class RealtimeConsumer(AsyncWebsocketConsumer):
         """Handle incoming messages from client (Twilio)"""
         try:
             data = json.loads(text_data)
+            
+            # Update activity for idle timeout tracking
+            if self.realtime_session:
+                self.realtime_session.update_activity()
             
             # Route messages to session manager
             if self.realtime_session:

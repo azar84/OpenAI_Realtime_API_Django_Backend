@@ -245,6 +245,12 @@ class AgentConfiguration(models.Model):
         help_text="Agent's timezone for time awareness (e.g., 'America/New_York', 'Europe/London', 'UTC')"
     )
     
+    # Call timeout settings
+    idle_timeout_seconds = models.IntegerField(
+        default=300,  # 5 minutes default
+        help_text="Maximum idle time in seconds before automatically disconnecting the call (0 = no timeout)"
+    )
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)

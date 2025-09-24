@@ -369,6 +369,11 @@ class RealtimeSession:
         self.latest_media_timestamp: Optional[float] = None
         self.conversation = None
         
+        # Idle timeout tracking
+        self.last_activity_time = asyncio.get_event_loop().time()
+        self.idle_timeout_task = None
+        self.idle_timeout_seconds = 300  # Default 5 minutes
+        
         # Function call argument buffering
         self._fn_arg_buffers = {}  # call_id -> {"name": str, "args": []}
         self._mcp_pending_calls = {}  # item_id -> arguments_json
@@ -389,6 +394,10 @@ class RealtimeSession:
                 logger.info(f"🤖 Session {self.session_id} initialized with agent: {self.agent_config.name} (ID: {self.agent_config.id})")
                 self.saved_config = self.agent_config.to_openai_config()
                 logger.info(f"🎯 Agent config loaded: voice={self.agent_config.voice}, instructions={self.agent_config.instructions[:50]}...")
+                
+                # Set idle timeout from agent config
+                self.idle_timeout_seconds = getattr(self.agent_config, 'idle_timeout_seconds', 300)
+                logger.info(f"⏰ Idle timeout set to {self.idle_timeout_seconds} seconds")
                 
                 # Log MCP integration status
                 if self.agent_config.has_mcp_integration():
@@ -648,23 +657,25 @@ class RealtimeSession:
                     if self.agent_config and hasattr(self.agent_config, 'user'):
                         from .models import PhoneNumber
                         try:
-                            # Check if caller_number belongs to our user (outgoing call)
+                            # Check if called_number belongs to our user (incoming call)
                             user_phone = PhoneNumber.objects.filter(
-                                phone_number=caller_number,
+                                phone_number=called_number,
                                 user=self.agent_config.user,
                                 is_active=True
                             ).first()
                             if user_phone:
-                                call_direction = "outgoing"
+                                call_direction = "incoming"
+                                logger.info(f"📞 Call direction: INCOMING (customer {caller_number} called our number {called_number})")
                             else:
-                                # Check if called_number belongs to our user (incoming call)
+                                # Check if caller_number belongs to our user (outgoing call)
                                 user_phone = PhoneNumber.objects.filter(
-                                    phone_number=called_number,
+                                    phone_number=caller_number,
                                     user=self.agent_config.user,
                                     is_active=True
                                 ).first()
                                 if user_phone:
-                                    call_direction = "incoming"
+                                    call_direction = "outgoing"
+                                    logger.info(f"📞 Call direction: OUTGOING (we called customer {called_number} from our number {caller_number})")
                         except Exception as e:
                             logger.debug(f"Could not determine call direction: {e}")
                             # Keep default "incoming"
@@ -1285,6 +1296,95 @@ Please review the error and try again with corrected parameters. Common issues i
         return (self.model_conn and 
                 self.model_conn.open and 
                 not self.model_conn.closed)
+    
+    def update_activity(self) -> None:
+        """Update the last activity time"""
+        self.last_activity_time = asyncio.get_event_loop().time()
+        
+        # Cancel existing timeout task and start a new one
+        if self.idle_timeout_task:
+            self.idle_timeout_task.cancel()
+        
+        # Start new timeout task if timeout is enabled
+        if self.idle_timeout_seconds > 0:
+            self.idle_timeout_task = asyncio.create_task(self._idle_timeout_handler())
+    
+    async def _idle_timeout_handler(self) -> None:
+        """Handle idle timeout - disconnect the call after idle period"""
+        try:
+            await asyncio.sleep(self.idle_timeout_seconds)
+            
+            # Check if we're still idle
+            current_time = asyncio.get_event_loop().time()
+            idle_duration = current_time - self.last_activity_time
+            
+            if idle_duration >= self.idle_timeout_seconds:
+                logger.info(f"⏰ Session {self.session_id[:8]}... timed out after {idle_duration:.1f} seconds of inactivity")
+                
+                # Send timeout message to caller
+                await self._send_timeout_message()
+                
+                # Disconnect the call
+                await self._disconnect_call()
+                
+        except asyncio.CancelledError:
+            # Task was cancelled (activity detected), this is normal
+            pass
+        except Exception as e:
+            logger.error(f"Error in idle timeout handler: {e}")
+    
+    async def _send_timeout_message(self) -> None:
+        """Send a timeout message to the caller"""
+        try:
+            timeout_message = {
+                "type": "conversation.item.create",
+                "item": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": "The call has been idle for too long and will be disconnected."
+                        }
+                    ]
+                }
+            }
+            
+            await self.send_to_model(timeout_message)
+            
+            # Create a response
+            response_create = {
+                "type": "response.create",
+                "response": {
+                    "modalities": ["text", "audio"],
+                    "instructions": "Inform the caller that the call is being disconnected due to inactivity. Be polite and brief."
+                }
+            }
+            
+            await self.send_to_model(response_create)
+            
+        except Exception as e:
+            logger.error(f"Error sending timeout message: {e}")
+    
+    async def _disconnect_call(self) -> None:
+        """Disconnect the call"""
+        try:
+            # Update database session status
+            if hasattr(self, 'call_session') and self.call_session:
+                from .consumers import RealtimeConsumer
+                # We need to access the consumer to update the database
+                if self.twilio_conn and hasattr(self.twilio_conn, 'update_session_status'):
+                    await self.twilio_conn.update_session_status('ended')
+            
+            # Clean up connections
+            await self.cleanup_all_connections()
+            
+            # Remove from session manager
+            if hasattr(session_manager, 'remove_session'):
+                session_manager.remove_session(self.session_id)
+                
+        except Exception as e:
+            logger.error(f"Error disconnecting call: {e}")
     
     async def cleanup_connection(self, conn) -> None:
         """Clean up a WebSocket connection"""
