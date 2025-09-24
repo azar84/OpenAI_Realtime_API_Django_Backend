@@ -18,6 +18,7 @@ import asyncio
 import websockets
 import ssl
 from typing import Optional, Dict, Any, List
+from channels.db import database_sync_to_async
 from datetime import datetime
 from django.conf import settings
 import logging
@@ -655,27 +656,9 @@ class RealtimeSession:
                 else:
                     # If no phone_number is set, try to determine from our agent's phone numbers
                     if self.agent_config and hasattr(self.agent_config, 'user'):
-                        from .models import PhoneNumber
                         try:
-                            # Check if called_number belongs to our user (incoming call)
-                            user_phone = PhoneNumber.objects.filter(
-                                phone_number=called_number,
-                                user=self.agent_config.user,
-                                is_active=True
-                            ).first()
-                            if user_phone:
-                                call_direction = "incoming"
-                                logger.info(f"📞 Call direction: INCOMING (customer {caller_number} called our number {called_number})")
-                            else:
-                                # Check if caller_number belongs to our user (outgoing call)
-                                user_phone = PhoneNumber.objects.filter(
-                                    phone_number=caller_number,
-                                    user=self.agent_config.user,
-                                    is_active=True
-                                ).first()
-                                if user_phone:
-                                    call_direction = "outgoing"
-                                    logger.info(f"📞 Call direction: OUTGOING (we called customer {called_number} from our number {caller_number})")
+                            # Use async database query to determine call direction
+                            call_direction = await self._determine_call_direction_async(caller_number, called_number)
                         except Exception as e:
                             logger.debug(f"Could not determine call direction: {e}")
                             # Keep default "incoming"
@@ -1296,6 +1279,35 @@ Please review the error and try again with corrected parameters. Common issues i
         return (self.model_conn and 
                 self.model_conn.open and 
                 not self.model_conn.closed)
+    
+    @database_sync_to_async
+    def _determine_call_direction_async(self, caller_number: str, called_number: str) -> str:
+        """Determine call direction using async database query"""
+        from .models import PhoneNumber
+        
+        # Check if called_number belongs to our user (incoming call)
+        user_phone = PhoneNumber.objects.filter(
+            phone_number=called_number,
+            user=self.agent_config.user,
+            is_active=True
+        ).first()
+        if user_phone:
+            logger.info(f"📞 Call direction: INCOMING (customer {caller_number} called our number {called_number})")
+            return "incoming"
+        
+        # Check if caller_number belongs to our user (outgoing call)
+        user_phone = PhoneNumber.objects.filter(
+            phone_number=caller_number,
+            user=self.agent_config.user,
+            is_active=True
+        ).first()
+        if user_phone:
+            logger.info(f"📞 Call direction: OUTGOING (we called customer {called_number} from our number {caller_number})")
+            return "outgoing"
+        
+        # Default to incoming if neither number is found
+        logger.warning(f"📞 Could not determine call direction for caller {caller_number} and called {called_number}")
+        return "incoming"
     
     def update_activity(self) -> None:
         """Update the last activity time"""
