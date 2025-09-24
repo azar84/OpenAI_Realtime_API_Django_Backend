@@ -15,4 +15,7 @@ urlpatterns = [
     path('template-instructions/', views.get_template_instructions, name='get_template_instructions'),
     path('conversation-history/<str:session_id>/', views.conversation_history, name='conversation_history'),
     path('conversation-events/<str:session_id>/', views.conversation_events, name='conversation_events'),
+    
+    # Chat history template
+    path('chat-history/<str:session_id>/', views.chat_history_view, name='chat_history'),
 ]

@@ -73,10 +73,20 @@ class RealtimeConsumer(AsyncWebsocketConsumer):
     
     @database_sync_to_async
     def update_session_status(self, status):
-        """Update call session status"""
+        """Update call session status and calculate duration if ending"""
         if self.call_session:
             self.call_session.status = status
-            self.call_session.save(update_fields=['status'])
+            
+            # Calculate duration if call is ending
+            if status == 'ended' and self.call_session.call_start_time:
+                from django.utils import timezone
+                end_time = timezone.now()
+                duration = (end_time - self.call_session.call_start_time).total_seconds()
+                self.call_session.call_end_time = end_time
+                self.call_session.call_duration_seconds = int(duration)
+                self.call_session.save(update_fields=['status', 'call_end_time', 'call_duration_seconds'])
+            else:
+                self.call_session.save(update_fields=['status'])
     
     @database_sync_to_async
     def get_routed_agent_config(self, query_params):

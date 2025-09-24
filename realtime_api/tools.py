@@ -130,24 +130,66 @@ async def calculate_math(expression: str) -> Dict[str, Any]:
     Returns:
         Dict containing calculation result
     """
+    logger.info(f"🧮 MATH CALCULATION: Starting calculation for: {expression}")
+    
     try:
         # Simple and safe evaluation for basic math
         # Only allow basic operators and numbers
         allowed_chars = set('0123456789+-*/.() ')
         if not all(c in allowed_chars for c in expression):
-            raise ValueError("Invalid characters in expression")
+            invalid_chars = [c for c in expression if c not in allowed_chars]
+            error_msg = f"Invalid characters in expression: {invalid_chars}"
+            logger.error(f"🧮 MATH CALCULATION: {error_msg}")
+            logger.error(f"🧮 MATH CALCULATION: Expression: {expression}")
+            logger.error(f"🧮 MATH CALCULATION: Allowed chars: {sorted(allowed_chars)}")
+            raise ValueError(error_msg)
         
+        logger.info(f"🧮 MATH CALCULATION: Expression validated, evaluating...")
         result = eval(expression)
+        
+        logger.info(f"🧮 MATH CALCULATION: ===== CALCULATION SUCCESS =====")
+        logger.info(f"🧮 MATH CALCULATION: Expression: {expression}")
+        logger.info(f"🧮 MATH CALCULATION: Result: {result}")
+        logger.info(f"🧮 MATH CALCULATION: Result Type: {type(result).__name__}")
         
         return {
             "expression": expression,
             "result": result,
-            "formatted_result": f"{expression} = {result}"
+            "formatted_result": f"{expression} = {result}",
+            "result_type": type(result).__name__
         }
-    except Exception as e:
+    except ValueError as e:
+        error_msg = f"Invalid expression: {str(e)}"
+        logger.error(f"🧮 MATH CALCULATION: ===== VALUE ERROR =====")
+        logger.error(f"🧮 MATH CALCULATION: {error_msg}")
+        logger.error(f"🧮 MATH CALCULATION: Expression: {expression}")
         return {
             "expression": expression,
-            "error": f"Could not calculate: {str(e)}",
+            "error": error_msg,
+            "error_type": "ValueError",
+            "result": None
+        }
+    except ZeroDivisionError as e:
+        error_msg = f"Division by zero: {str(e)}"
+        logger.error(f"🧮 MATH CALCULATION: ===== DIVISION BY ZERO =====")
+        logger.error(f"🧮 MATH CALCULATION: {error_msg}")
+        logger.error(f"🧮 MATH CALCULATION: Expression: {expression}")
+        return {
+            "expression": expression,
+            "error": error_msg,
+            "error_type": "ZeroDivisionError",
+            "result": None
+        }
+    except Exception as e:
+        error_msg = f"Calculation error: {str(e)}"
+        logger.error(f"🧮 MATH CALCULATION: ===== UNEXPECTED ERROR =====")
+        logger.error(f"🧮 MATH CALCULATION: {error_msg}")
+        logger.error(f"🧮 MATH CALCULATION: Expression: {expression}")
+        logger.error(f"🧮 MATH CALCULATION: Error Type: {type(e).__name__}")
+        return {
+            "expression": expression,
+            "error": error_msg,
+            "error_type": type(e).__name__,
             "result": None
         }
 
@@ -247,20 +289,114 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, A
     Returns:
         Dict containing the tool execution result
     """
+    # Enhanced debug logging
+    logger.info(f"🔧 TOOL EXECUTION: ===== TOOL EXECUTION START =====")
+    logger.info(f"🔧 TOOL EXECUTION: Tool Name: {tool_name}")
+    logger.info(f"🔧 TOOL EXECUTION: Arguments: {json.dumps(arguments, indent=2)}")
+    logger.info(f"🔧 TOOL EXECUTION: Timestamp: {datetime.now().isoformat()}")
+    logger.info(f"🔧 TOOL EXECUTION: Available Tools: {list(TOOL_REGISTRY.keys())}")
+    
     if tool_name not in TOOL_REGISTRY:
         error_msg = f"Unknown tool: {tool_name}"
+        logger.error(f"🔧 TOOL EXECUTION: ===== TOOL NOT FOUND =====")
         logger.error(f"🔧 TOOL EXECUTION: {error_msg}")
-        return {"error": error_msg}
+        logger.error(f"🔧 TOOL EXECUTION: Available tools: {list(TOOL_REGISTRY.keys())}")
+        return {
+            "error": error_msg,
+            "available_tools": list(TOOL_REGISTRY.keys()),
+            "tool_name": tool_name,
+            "arguments": arguments
+        }
     
     try:
-        tool_function = TOOL_REGISTRY[tool_name]["function"]
+        # Get tool function and metadata
+        tool_info = TOOL_REGISTRY[tool_name]
+        tool_function = tool_info["function"]
+        tool_description = tool_info["description"]
+        
+        logger.info(f"🔧 TOOL EXECUTION: Tool Found: {tool_name}")
+        logger.info(f"🔧 TOOL EXECUTION: Description: {tool_description}")
+        logger.info(f"🔧 TOOL EXECUTION: Function: {tool_function.__name__}")
+        
+        # Validate arguments against schema
+        required_params = tool_info["parameters"].get("required", [])
+        logger.info(f"🔧 TOOL EXECUTION: Required Parameters: {required_params}")
+        logger.info(f"🔧 TOOL EXECUTION: Provided Arguments: {list(arguments.keys())}")
+        
+        # Check for missing required parameters
+        missing_params = [param for param in required_params if param not in arguments]
+        if missing_params:
+            error_msg = f"Missing required parameters: {missing_params}"
+            logger.error(f"🔧 TOOL EXECUTION: ===== MISSING PARAMETERS =====")
+            logger.error(f"🔧 TOOL EXECUTION: {error_msg}")
+            logger.error(f"🔧 TOOL EXECUTION: Required: {required_params}")
+            logger.error(f"🔧 TOOL EXECUTION: Provided: {list(arguments.keys())}")
+            return {
+                "error": error_msg,
+                "missing_parameters": missing_params,
+                "required_parameters": required_params,
+                "provided_arguments": list(arguments.keys()),
+                "tool_name": tool_name
+            }
+        
+        # Execute the tool
+        logger.info(f"🔧 TOOL EXECUTION: Starting execution...")
         result = await tool_function(**arguments)
-        logger.info(f"🔧 TOOL EXECUTION: {tool_name} completed")
+        
+        # Enhanced success logging
+        logger.info(f"🔧 TOOL EXECUTION: ===== TOOL EXECUTION SUCCESS =====")
+        logger.info(f"🔧 TOOL EXECUTION: Tool: {tool_name}")
+        logger.info(f"🔧 TOOL EXECUTION: Result Type: {type(result).__name__}")
+        if isinstance(result, dict):
+            logger.info(f"🔧 TOOL EXECUTION: Result Keys: {list(result.keys())}")
+            if 'error' in result:
+                logger.warning(f"🔧 TOOL EXECUTION: Tool returned error in result: {result['error']}")
+            else:
+                logger.info(f"🔧 TOOL EXECUTION: Result: {json.dumps(result, indent=2)}")
+        else:
+            logger.info(f"🔧 TOOL EXECUTION: Result: {str(result)}")
+        
         return result
-    except Exception as e:
-        error_msg = f"Error executing tool {tool_name}: {str(e)}"
+        
+    except TypeError as e:
+        error_msg = f"Type error executing tool {tool_name}: {str(e)}"
+        logger.error(f"🔧 TOOL EXECUTION: ===== TYPE ERROR =====")
         logger.error(f"🔧 TOOL EXECUTION: {error_msg}")
-        return {"error": error_msg}
+        logger.error(f"🔧 TOOL EXECUTION: Arguments: {arguments}")
+        logger.error(f"🔧 TOOL EXECUTION: Tool function signature: {tool_function.__name__}")
+        return {
+            "error": error_msg,
+            "error_type": "TypeError",
+            "tool_name": tool_name,
+            "arguments": arguments,
+            "function_name": tool_function.__name__
+        }
+    except ValueError as e:
+        error_msg = f"Value error executing tool {tool_name}: {str(e)}"
+        logger.error(f"🔧 TOOL EXECUTION: ===== VALUE ERROR =====")
+        logger.error(f"🔧 TOOL EXECUTION: {error_msg}")
+        logger.error(f"🔧 TOOL EXECUTION: Arguments: {arguments}")
+        return {
+            "error": error_msg,
+            "error_type": "ValueError",
+            "tool_name": tool_name,
+            "arguments": arguments
+        }
+    except Exception as e:
+        error_msg = f"Unexpected error executing tool {tool_name}: {str(e)}"
+        logger.error(f"🔧 TOOL EXECUTION: ===== UNEXPECTED ERROR =====")
+        logger.error(f"🔧 TOOL EXECUTION: {error_msg}")
+        logger.error(f"🔧 TOOL EXECUTION: Error Type: {type(e).__name__}")
+        logger.error(f"🔧 TOOL EXECUTION: Arguments: {arguments}")
+        logger.error(f"🔧 TOOL EXECUTION: Tool: {tool_name}")
+        logger.error(f"🔧 TOOL EXECUTION: Timestamp: {datetime.now().isoformat()}")
+        return {
+            "error": error_msg,
+            "error_type": type(e).__name__,
+            "tool_name": tool_name,
+            "arguments": arguments,
+            "exception_details": str(e)
+        }
 
 
 def get_tools_for_openai() -> list:

@@ -214,9 +214,20 @@ class ConversationTracker:
                         {"response": event_data.get("response", {})}
                     )
                     
-            elif event_type in ("response.output_text.done", "response.done", "response.completed"):
+            elif event_type == "response.audio_transcript.delta":
+                # Assistant audio transcript streaming (AI speech-to-text)
+                response_id = event_data.get("response_id", "")
+                delta = event_data.get("delta", "")
+                if response_id and delta:
+                    self.turn_builder.add_assistant_delta(
+                        response_id, 
+                        delta, 
+                        {"response_id": response_id, "audio_transcript": True}
+                    )
+                    
+            elif event_type in ("response.output_text.done", "response.done", "response.completed", "response.audio_transcript.done"):
                 # Finalize assistant turn
-                response_id = event_data.get("response", {}).get("id", "")
+                response_id = event_data.get("response_id", "") or event_data.get("response", {}).get("id", "")
                 if response_id:
                     await self.turn_builder.finalize_assistant_turn(conversation, response_id)
                     
@@ -245,6 +256,7 @@ class ConversationTracker:
                 "response.output_text.done", 
                 "response.done", 
                 "response.completed",
+                "response.audio_transcript.done",
                 "conversation.item.input_audio_transcription.failed"
             ]:
                 logger.debug(f"📝 Processed event: {event_type}")

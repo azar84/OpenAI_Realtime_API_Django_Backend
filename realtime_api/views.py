@@ -211,3 +211,39 @@ def conversation_events(request, session_id):
         
     except CallSession.DoesNotExist:
         return JsonResponse({'error': 'Session not found'}, status=404)
+
+def chat_history_view(request, session_id):
+    """Render chat history template for a call session"""
+    from django.shortcuts import render, get_object_or_404
+    from django.contrib.auth.decorators import login_required
+    from .models import CallSession
+    
+    # Get the call session
+    call_session = get_object_or_404(CallSession, session_id=session_id)
+    
+    # Check permissions - users can only view their own sessions unless they're superuser
+    if not request.user.is_superuser:
+        if not call_session.phone_number or call_session.phone_number.user != request.user:
+            from django.http import HttpResponseForbidden
+            return HttpResponseForbidden("You don't have permission to view this chat history.")
+    
+    # Get conversations with prefetched turns for better performance
+    conversations = call_session.conversations.prefetch_related('turns').all()
+    
+    # Sort turns by completion timestamp for each conversation
+    for conversation in conversations:
+        # Use a fresh query with explicit NULL handling for proper sorting
+        from django.db.models import F, Case, When, Value
+        conversation.turns_sorted = conversation.turns.all().order_by(
+            Case(
+                When(completed_at__isnull=False, then='completed_at'),
+                default='started_at'
+            )
+        )
+    
+    context = {
+        'call_session': call_session,
+        'conversations': conversations,
+    }
+    
+    return render(request, 'realtime_api/chat_history.html', context)

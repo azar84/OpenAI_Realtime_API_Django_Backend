@@ -74,9 +74,12 @@ class ToolHandler:
         arguments = item.get('arguments', '{}')
         call_id = item.get('call_id')
         
-        self.logger.info(f"🔧 TOOL CALL: Agent is calling function: {function_name}")
+        # Enhanced debug logging
+        self.logger.info(f"🔧 TOOL CALL: ===== TOOL EXECUTION START =====")
+        self.logger.info(f"🔧 TOOL CALL: Function Name: {function_name}")
         self.logger.info(f"🔧 TOOL CALL: Call ID: {call_id}")
-        self.logger.info(f"🔧 TOOL CALL: Arguments: {arguments}")
+        self.logger.info(f"🔧 TOOL CALL: Raw Arguments: {arguments}")
+        self.logger.info(f"🔧 TOOL CALL: Timestamp: {datetime.now().isoformat()}")
         
         # Check if this is an MCP tool call
         if self._is_mcp_tool(function_name):
@@ -87,21 +90,53 @@ class ToolHandler:
             # Send holding message to avoid dead air
             await self._send_holding_message()
             
-            # Parse and execute tool
-            args = json.loads(arguments)
-            self.logger.info(f"🔧 TOOL CALL: Parsed arguments: {args}")
+            # Parse and execute tool with enhanced error handling
+            try:
+                args = json.loads(arguments)
+                self.logger.info(f"🔧 TOOL CALL: Parsed Arguments: {json.dumps(args, indent=2)}")
+            except json.JSONDecodeError as json_err:
+                self.logger.error(f"🔧 TOOL CALL: JSON Parse Error: {json_err}")
+                self.logger.error(f"🔧 TOOL CALL: Invalid JSON: {arguments}")
+                raise
             
-            self.logger.info(f"🔧 TOOL CALL: Executing tool {function_name}...")
+            self.logger.info(f"🔧 TOOL CALL: Starting execution of {function_name}...")
             result = await execute_tool(function_name, args)
-            self.logger.info(f"🔧 TOOL CALL: Tool execution completed")
-            self.logger.info(f"🔧 TOOL CALL: Result: {json.dumps(result, indent=2) if isinstance(result, dict) else str(result)}")
+            
+            # Enhanced result logging
+            self.logger.info(f"🔧 TOOL CALL: ===== TOOL EXECUTION COMPLETED =====")
+            self.logger.info(f"🔧 TOOL CALL: Function: {function_name}")
+            self.logger.info(f"🔧 TOOL CALL: Success: True")
+            if isinstance(result, dict):
+                self.logger.info(f"🔧 TOOL CALL: Result Type: Dict")
+                self.logger.info(f"🔧 TOOL CALL: Result Keys: {list(result.keys())}")
+                if 'error' in result:
+                    self.logger.error(f"🔧 TOOL CALL: Tool returned error: {result['error']}")
+                else:
+                    self.logger.info(f"🔧 TOOL CALL: Result: {json.dumps(result, indent=2)}")
+            else:
+                self.logger.info(f"🔧 TOOL CALL: Result Type: {type(result).__name__}")
+                self.logger.info(f"🔧 TOOL CALL: Result: {str(result)}")
             
             # Send tool result and trigger response
             await self._send_tool_result_and_trigger_response(call_id, result)
             
         except Exception as e:
-            self.logger.error(f"🔧 TOOL CALL: Error handling function call {function_name}: {e}")
-            self.logger.error(f"🔧 TOOL CALL: Call ID: {call_id}, Arguments: {arguments}")
+            # Enhanced error logging
+            self.logger.error(f"🔧 TOOL CALL: ===== TOOL EXECUTION FAILED =====")
+            self.logger.error(f"🔧 TOOL CALL: Function: {function_name}")
+            self.logger.error(f"🔧 TOOL CALL: Call ID: {call_id}")
+            self.logger.error(f"🔧 TOOL CALL: Error Type: {type(e).__name__}")
+            self.logger.error(f"🔧 TOOL CALL: Error Message: {str(e)}")
+            self.logger.error(f"🔧 TOOL CALL: Arguments: {arguments}")
+            self.logger.error(f"🔧 TOOL CALL: Timestamp: {datetime.now().isoformat()}")
+            
+            # Send error result to model
+            error_result = {
+                "error": f"Tool execution failed: {str(e)}",
+                "function_name": function_name,
+                "call_id": call_id
+            }
+            await self._send_tool_result_and_trigger_response(call_id, error_result)
     
     def _is_mcp_tool(self, function_name: str) -> bool:
         """Check if function is an MCP tool"""
@@ -121,18 +156,29 @@ class ToolHandler:
     
     async def _send_tool_result_and_trigger_response(self, call_id: str, result: Any) -> None:
         """Send tool result and trigger audio response"""
+        self.logger.info(f"🔧 TOOL CALL: ===== SENDING TOOL RESULT =====")
+        self.logger.info(f"🔧 TOOL CALL: Call ID: {call_id}")
+        self.logger.info(f"🔧 TOOL CALL: Result Type: {type(result).__name__}")
+        
         # Step 1: Attach tool result to conversation
         function_output = {
             "type": "conversation.item.create",
             "item": {
                 "type": "function_call_output",
                 "call_id": call_id,
-                "output": json.dumps(result)
+                "output": json.dumps(result) if not isinstance(result, str) else result
             }
         }
         
-        await self.session.send_to_model(function_output)
-        self.logger.info(f"🔧 TOOL CALL: Step 1 - Tool result attached to conversation")
+        self.logger.info(f"🔧 TOOL CALL: Step 1 - Attaching tool result to conversation...")
+        self.logger.info(f"🔧 TOOL CALL: Function output: {json.dumps(function_output, indent=2)}")
+        
+        try:
+            await self.session.send_to_model(function_output)
+            self.logger.info(f"🔧 TOOL CALL: Step 1 - Tool result attached to conversation successfully")
+        except Exception as e:
+            self.logger.error(f"🔧 TOOL CALL: Step 1 - Failed to attach tool result: {e}")
+            return
         
         # Step 2: Trigger generation with audio
         response_create = {
@@ -143,9 +189,15 @@ class ToolHandler:
             }
         }
         
-        await self.session.send_to_model(response_create)
-        self.logger.info(f"🔧 TOOL CALL: Step 2 - Response generation triggered with audio")
-        self.logger.info(f"🔧 TOOL CALL: Agent will now speak the tool result to the caller")
+        self.logger.info(f"🔧 TOOL CALL: Step 2 - Triggering response generation...")
+        self.logger.info(f"🔧 TOOL CALL: Response create: {json.dumps(response_create, indent=2)}")
+        
+        try:
+            await self.session.send_to_model(response_create)
+            self.logger.info(f"🔧 TOOL CALL: Step 2 - Response generation triggered with audio successfully")
+            self.logger.info(f"🔧 TOOL CALL: Agent will now speak the tool result to the caller")
+        except Exception as e:
+            self.logger.error(f"🔧 TOOL CALL: Step 2 - Failed to trigger response: {e}")
 
 
 class AudioHandler:
@@ -158,13 +210,16 @@ class AudioHandler:
     async def handle_audio_response(self, event: Dict[str, Any]) -> None:
         """Handle audio response from OpenAI and send to Twilio"""
         if not self.session.twilio_conn or not self.session.stream_sid:
+            self.logger.warning(f"🎵 AUDIO RESPONSE: Missing Twilio connection or stream SID")
             return
             
         delta = event.get('delta', '')
         item_id = event.get('item_id')
         
+        # Only log when response starts (first delta)
         if self.session.response_start_timestamp is None:
             self.session.response_start_timestamp = self.session.latest_media_timestamp or 0
+            self.logger.info(f"🎵 AUDIO RESPONSE: Response started at timestamp: {self.session.response_start_timestamp}")
             
         if item_id:
             self.session.last_assistant_item = item_id
@@ -176,7 +231,10 @@ class AudioHandler:
             "media": {"payload": delta}
         }
         
-        await self.session.send_to_twilio(media_message)
+        try:
+            await self.session.send_to_twilio(media_message)
+        except Exception as e:
+            self.logger.error(f"🎵 AUDIO RESPONSE: Failed to send audio to Twilio: {e}")
         
         # Send mark for synchronization
         mark_message = {
@@ -184,7 +242,10 @@ class AudioHandler:
             "streamSid": self.session.stream_sid
         }
         
-        await self.session.send_to_twilio(mark_message)
+        try:
+            await self.session.send_to_twilio(mark_message)
+        except Exception as e:
+            self.logger.error(f"🎵 AUDIO RESPONSE: Failed to send mark to Twilio: {e}")
     
     async def handle_speech_interruption(self) -> None:
         """Handle user speech interruption"""
@@ -622,14 +683,22 @@ class RealtimeSession:
             event = json.loads(data)
             event_type = event.get('type')
             
-            # Log important MCP and tool events
+            # Enhanced logging for important MCP and tool events
             if event_type and ('mcp' in event_type.lower() or 'function' in event_type.lower() or 'tool' in event_type.lower()):
                 if event_type in ['response.mcp_call_arguments.done', 'response.mcp_call.completed', 'response.function_call_arguments.done', 'conversation.item.create']:
-                    logger.info(f"🔗 MCP/TOOL EVENT: {event_type}")
+                    logger.info(f"🔗 MCP/TOOL EVENT: ===== {event_type} =====")
+                    logger.info(f"🔗 MCP/TOOL EVENT: Event: {event_type}")
+                    logger.info(f"🔗 MCP/TOOL EVENT: Timestamp: {datetime.now().isoformat()}")
+                    if event_type == 'conversation.item.create':
+                        item = event.get('item', {})
+                        logger.info(f"🔗 MCP/TOOL EVENT: Item Type: {item.get('type', 'unknown')}")
+                        if item.get('type') == 'function_call':
+                            logger.info(f"🔗 MCP/TOOL EVENT: Function Name: {item.get('name', 'unknown')}")
                 elif event_type in ['response.mcp_call_arguments.delta', 'response.function_call_arguments.delta']:
-                    logger.debug(f"🔗 MCP/TOOL STREAMING: {event_type}")
+                    logger.debug(f"🔗 MCP/TOOL STREAMING: {event_type} - Delta length: {len(event.get('delta', ''))}")
                 else:
                     logger.info(f"🔗 MCP/TOOL EVENT: {event_type}")
+                    logger.info(f"🔗 MCP/TOOL EVENT: Event details: {json.dumps(event, indent=2)}")
             
             # Track all events for conversation history
             if self.conversation:
@@ -644,76 +713,249 @@ class RealtimeSession:
                 call_id = event.get('call_id')
                 name = event.get('name')
                 chunk = event.get('delta', '')
+                
+                logger.debug(f"🔧 TOOL CALL: Function call delta - Call ID: {call_id}, Name: {name}, Chunk length: {len(chunk)}")
+                
                 if call_id:
                     buf = self._fn_arg_buffers.setdefault(call_id, {"name": name, "args": []})
                     if name and not buf.get("name"):
                         buf["name"] = name
                     buf["args"].append(chunk)
+                    logger.debug(f"🔧 TOOL CALL: Buffered chunk for {call_id}, total chunks: {len(buf['args'])}")
                 else:
                     logger.warning(f"🔧 TOOL CALL: No call_id in delta event")
+                    logger.warning(f"🔧 TOOL CALL: Event: {json.dumps(event, indent=2)}")
             elif event_type == 'response.function_call_arguments.done':
                 # Function call arguments are complete - execute the tool
                 call_id = event.get('call_id')
                 
+                logger.info(f"🔧 TOOL CALL: ===== FUNCTION CALL ARGUMENTS COMPLETE =====")
+                logger.info(f"🔧 TOOL CALL: Call ID: {call_id}")
+                logger.info(f"🔧 TOOL CALL: Event: {event_type}")
+                logger.info(f"🔧 TOOL CALL: Available buffers: {list(self._fn_arg_buffers.keys())}")
+                
                 if not call_id or call_id not in self._fn_arg_buffers:
-                    logger.warning(f"🔧 TOOL CALL: No buffer found for call_id {call_id}")
+                    logger.error(f"🔧 TOOL CALL: No buffer found for call_id {call_id}")
+                    logger.error(f"🔧 TOOL CALL: Available call_ids: {list(self._fn_arg_buffers.keys())}")
                     return
                 
                 name = self._fn_arg_buffers[call_id]["name"] or event.get('name') or ''
                 raw_args = ''.join(self._fn_arg_buffers[call_id]["args"])  # JSON text
                 
-                logger.info(f"🔧 TOOL CALL: Executing {name} with args: {raw_args}")
-                logger.info(f"🔧 TOOL CALL: Tool execution started for {name}")
+                logger.info(f"🔧 TOOL CALL: Function Name: {name}")
+                logger.info(f"🔧 TOOL CALL: Raw Arguments: {raw_args}")
+                logger.info(f"🔧 TOOL CALL: Buffer Size: {len(self._fn_arg_buffers[call_id]['args'])} chunks")
                 
                 # Clean up buffer early to avoid leaks
                 del self._fn_arg_buffers[call_id]
+                logger.info(f"🔧 TOOL CALL: Buffer cleaned up for call_id {call_id}")
                 
                 # Hand off to tool execution
+                logger.info(f"🔧 TOOL CALL: Handing off to tool execution...")
                 await self._handle_function_call_from_args(name, raw_args, call_id)
             elif event_type == 'response.mcp_call_arguments.delta':
                 # Buffer MCP call arguments as they stream in
                 item_id = event.get('item_id')
                 chunk = event.get('delta', '')
+                
+                logger.debug(f"🔗 MCP TOOL CALL: MCP call delta - Item ID: {item_id}, Chunk length: {len(chunk)}")
+                
                 if item_id:
                     buf = self._fn_arg_buffers.setdefault(item_id, {"name": "mcp_call", "args": []})
                     buf["args"].append(chunk)
+                    logger.debug(f"🔗 MCP TOOL CALL: Buffered chunk for {item_id}, total chunks: {len(buf['args'])}")
+                    
+                    # Log the current accumulated content for debugging
+                    current_content = ''.join(buf["args"])
+                    if len(current_content) > 0:
+                        logger.debug(f"🔗 MCP TOOL CALL: Current accumulated content: {current_content[:200]}...")
                 else:
                     logger.warning(f"🔗 MCP TOOL CALL: No item_id in delta event")
+                    logger.warning(f"🔗 MCP TOOL CALL: Event: {json.dumps(event, indent=2)}")
+            elif event_type == 'response.mcp_call.in_progress':
+                # MCP call is in progress
+                item_id = event.get('item_id')
+                logger.info(f"🔗 MCP TOOL CALL: ===== MCP CALL IN PROGRESS =====")
+                logger.info(f"🔗 MCP TOOL CALL: Item ID: {item_id}")
+                logger.info(f"🔗 MCP TOOL CALL: Event: {event_type}")
+                logger.info(f"🔗 MCP TOOL CALL: MCP server is processing the call...")
+                
+                # Log any additional progress information
+                if 'content' in event:
+                    content = event.get('content', [])
+                    logger.info(f"🔗 MCP TOOL CALL: Progress content: {json.dumps(content, indent=2)}")
+            elif event_type == 'response.mcp_call.failed':
+                # MCP call failed
+                item_id = event.get('item_id')
+                logger.error(f"🔗 MCP TOOL CALL: ===== MCP CALL FAILED =====")
+                logger.error(f"🔗 MCP TOOL CALL: Item ID: {item_id}")
+                logger.error(f"🔗 MCP TOOL CALL: Event: {event_type}")
+                logger.error(f"🔗 MCP TOOL CALL: Full Event: {json.dumps(event, indent=2)}")
+                
+                # Extract error details from the event
+                error_details = event.get('error', {})
+                error_message = error_details.get('message', 'Unknown error')
+                error_code = error_details.get('code', 'Unknown code')
+                
+                logger.error(f"🔗 MCP TOOL CALL: Error Code: {error_code}")
+                logger.error(f"🔗 MCP TOOL CALL: Error Message: {error_message}")
+                
+                # Clean up any pending call for this item
+                self._mcp_pending_calls = getattr(self, '_mcp_pending_calls', {})
+                if item_id in self._mcp_pending_calls:
+                    failed_args = self._mcp_pending_calls[item_id]
+                    del self._mcp_pending_calls[item_id]
+                    logger.error(f"🔗 MCP TOOL CALL: Failed call arguments: {failed_args}")
+                    
+                    # Send error feedback to the agent
+                    await self._send_mcp_error_feedback(item_id, failed_args, error_message, error_code)
+                
+                logger.error(f"🔗 MCP TOOL CALL: MCP server failed to process the call")
             elif event_type == 'response.mcp_call_arguments.done':
                 # MCP call arguments are complete - execute the tool
                 item_id = event.get('item_id')
                 arguments = event.get('arguments', '{}')
                 
+                logger.info(f"🔗 MCP TOOL CALL: ===== MCP ARGUMENTS COMPLETE =====")
+                logger.info(f"🔗 MCP TOOL CALL: Item ID: {item_id}")
+                logger.info(f"🔗 MCP TOOL CALL: Event Arguments: {arguments}")
+                logger.info(f"🔗 MCP TOOL CALL: Available Buffers: {list(self._fn_arg_buffers.keys())}")
+                
                 # Get the buffered arguments if available
                 if item_id and item_id in self._fn_arg_buffers:
                     raw_args = ''.join(self._fn_arg_buffers[item_id]["args"])
+                    logger.info(f"🔗 MCP TOOL CALL: Using buffered arguments: {raw_args}")
+                    logger.info(f"🔗 MCP TOOL CALL: Buffer size: {len(self._fn_arg_buffers[item_id]['args'])} chunks")
                     del self._fn_arg_buffers[item_id]
+                    logger.info(f"🔗 MCP TOOL CALL: Buffer cleaned up for item_id {item_id}")
                 else:
                     raw_args = arguments
+                    logger.info(f"🔗 MCP TOOL CALL: Using event arguments: {raw_args}")
+                
+                # Parse and log the MCP tool call details
+                try:
+                    parsed_args = json.loads(raw_args)
+                    
+                    # Extract tool name and parameters from the parsed arguments
+                    if isinstance(parsed_args, dict):
+                        # Check if this is a direct parameter object
+                        if 'name' in parsed_args:
+                            tool_name = parsed_args.get('name', 'Unknown MCP Tool')
+                            tool_params = parsed_args.get('arguments', {})
+                        else:
+                            # This might be the parameters directly
+                            tool_name = 'MCP Tool (name not provided)'
+                            tool_params = parsed_args
+                    else:
+                        tool_name = 'MCP Tool (invalid format)'
+                        tool_params = {}
+                    
+                    logger.info(f"🔗 MCP TOOL CALL: ===== MCP TOOL REQUEST =====")
+                    logger.info(f"🔗 MCP TOOL CALL: Tool Name: {tool_name}")
+                    logger.info(f"🔗 MCP TOOL CALL: Request Parameters:")
+                    logger.info(f"🔗 MCP TOOL CALL: {json.dumps(tool_params, indent=2)}")
+                    logger.info(f"🔗 MCP TOOL CALL: Raw Arguments: {raw_args}")
+                    logger.info(f"🔗 MCP TOOL CALL: ===== END REQUEST =====")
+                except json.JSONDecodeError as e:
+                    logger.warning(f"🔗 MCP TOOL CALL: Could not parse MCP arguments: {e}")
+                    logger.warning(f"🔗 MCP TOOL CALL: Raw arguments: {raw_args}")
+                    logger.info(f"🔗 MCP TOOL CALL: ===== MCP TOOL REQUEST =====")
+                    logger.info(f"🔗 MCP TOOL CALL: Tool Name: Unknown MCP Tool (JSON Parse Error)")
+                    logger.info(f"🔗 MCP TOOL CALL: Request Parameters: {raw_args}")
+                    logger.info(f"🔗 MCP TOOL CALL: ===== END REQUEST =====")
                 
                 # For MCP calls, we need to wait for the actual completion event
                 # Store the arguments for when the call completes
                 self._mcp_pending_calls = getattr(self, '_mcp_pending_calls', {})
                 self._mcp_pending_calls[item_id] = raw_args
                 logger.info(f"🔗 MCP TOOL CALL: MCP call ready - {item_id}")
+                logger.info(f"🔗 MCP TOOL CALL: Raw arguments stored: {raw_args}")
                 logger.info(f"🔗 MCP TOOL CALL: Waiting for MCP server to process call")
+                logger.info(f"🔗 MCP TOOL CALL: Pending calls: {list(self._mcp_pending_calls.keys())}")
             elif event_type == 'response.mcp_call.completed':
                 # MCP call completed - now we can handle the result
                 item_id = event.get('item_id')
                 
+                logger.info(f"🔗 MCP TOOL CALL: ===== MCP CALL COMPLETED =====")
+                logger.info(f"🔗 MCP TOOL CALL: Item ID: {item_id}")
+                logger.info(f"🔗 MCP TOOL CALL: Event: {event_type}")
+                logger.info(f"🔗 MCP TOOL CALL: Full Event: {json.dumps(event, indent=2)}")
+                
                 # Get the stored arguments
                 self._mcp_pending_calls = getattr(self, '_mcp_pending_calls', {})
+                logger.info(f"🔗 MCP TOOL CALL: Pending calls: {list(self._mcp_pending_calls.keys())}")
+                
                 if item_id in self._mcp_pending_calls:
                     raw_args = self._mcp_pending_calls[item_id]
                     del self._mcp_pending_calls[item_id]
                     logger.info(f"🔗 MCP TOOL CALL: MCP call completed - {item_id}")
+                    logger.info(f"🔗 MCP TOOL CALL: Stored arguments: {raw_args}")
                     logger.info(f"🔗 MCP TOOL CALL: MCP server processed call successfully")
+                    
+                    # Parse and log the original request for context
+                    try:
+                        parsed_args = json.loads(raw_args)
+                        
+                        # Extract tool name and parameters from the parsed arguments
+                        if isinstance(parsed_args, dict):
+                            # Check if this is a direct parameter object
+                            if 'name' in parsed_args:
+                                tool_name = parsed_args.get('name', 'Unknown MCP Tool')
+                                tool_params = parsed_args.get('arguments', {})
+                            else:
+                                # This might be the parameters directly
+                                tool_name = 'MCP Tool (name not provided)'
+                                tool_params = parsed_args
+                        else:
+                            tool_name = 'MCP Tool (invalid format)'
+                            tool_params = {}
+                        
+                        logger.info(f"🔗 MCP TOOL CALL: ===== MCP TOOL RESPONSE =====")
+                        logger.info(f"🔗 MCP TOOL CALL: Tool Name: {tool_name}")
+                        logger.info(f"🔗 MCP TOOL CALL: Original Request Parameters:")
+                        logger.info(f"🔗 MCP TOOL CALL: {json.dumps(tool_params, indent=2)}")
+                        logger.info(f"🔗 MCP TOOL CALL: Raw Arguments: {raw_args}")
+                        
+                        # Extract response content if available
+                        response_content = event.get('content', [])
+                        if response_content:
+                            logger.info(f"🔗 MCP TOOL CALL: Response Content:")
+                            for content_item in response_content:
+                                if content_item.get('type') == 'text':
+                                    logger.info(f"🔗 MCP TOOL CALL: {content_item.get('text', '')}")
+                                elif content_item.get('type') == 'resource':
+                                    resource = content_item.get('resource', {})
+                                    logger.info(f"🔗 MCP TOOL CALL: Resource: {json.dumps(resource, indent=2)}")
+                        
+                        # Check for any error information in the completion event
+                        error_info = event.get('error')
+                        if error_info:
+                            logger.warning(f"🔗 MCP TOOL CALL: Completion with error info: {json.dumps(error_info, indent=2)}")
+                            
+                            # Send error feedback to agent even for "completed" calls with errors
+                            error_message = error_info.get('message', 'Unknown error')
+                            error_code = error_info.get('code', 'Unknown code')
+                            await self._send_mcp_error_feedback(item_id, raw_args, error_message, error_code)
+                        
+                        logger.info(f"🔗 MCP TOOL CALL: ===== END RESPONSE =====")
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"🔗 MCP TOOL CALL: Could not parse stored arguments: {e}")
+                        logger.info(f"🔗 MCP TOOL CALL: ===== MCP TOOL RESPONSE =====")
+                        logger.info(f"🔗 MCP TOOL CALL: Tool Name: Unknown MCP Tool (JSON Parse Error)")
+                        logger.info(f"🔗 MCP TOOL CALL: Original Request Parameters: {raw_args}")
+                        logger.info(f"🔗 MCP TOOL CALL: ===== END RESPONSE =====")
+                    
+                    logger.info(f"🔗 MCP TOOL CALL: Triggering response generation...")
                     
                     # For MCP calls, we don't need to execute tools - the MCP server handles it
                     # We just need to trigger a response to speak the result
                     await self._handle_mcp_call_completion(item_id, raw_args)
+                    logger.info(f"🔗 MCP TOOL CALL: Response generation completed")
                 else:
-                    logger.warning(f"🔗 MCP TOOL CALL: No pending call found for item_id {item_id}")
+                    logger.error(f"🔗 MCP TOOL CALL: ===== NO PENDING CALL FOUND =====")
+                    logger.error(f"🔗 MCP TOOL CALL: Item ID: {item_id}")
+                    logger.error(f"🔗 MCP TOOL CALL: Available pending calls: {list(self._mcp_pending_calls.keys())}")
+                    logger.error(f"🔗 MCP TOOL CALL: This may indicate a timing issue or lost call")
             elif event_type == 'response.output_item.done':
                 # Check if this is a function call item (fallback detection)
                 item = event.get('item', {})
@@ -737,24 +979,111 @@ class RealtimeSession:
     
     async def _handle_mcp_call_completion(self, item_id: str, arguments_json: str) -> None:
         """Handle MCP call completion - trigger response to speak the result"""
-        # Send a response to make the agent speak about the MCP result
-        await self.send_to_model({
-            "type": "response.create",
-            "response": {
-                "modalities": ["audio", "text"],
-                "instructions": (
-                    "The MCP tool call has completed. Please explain the results to the caller "
-                    "in a clear and helpful way, and ask if they need anything else."
-                )
+        logger.info(f"🔗 MCP TOOL CALL: ===== HANDLING MCP COMPLETION =====")
+        logger.info(f"🔗 MCP TOOL CALL: Item ID: {item_id}")
+        logger.info(f"🔗 MCP TOOL CALL: Arguments: {arguments_json}")
+        
+        try:
+            # Send a response to make the agent speak about the MCP result
+            response_message = {
+                "type": "response.create",
+                "response": {
+                    "modalities": ["audio", "text"],
+                    "instructions": (
+                        "The MCP tool call has completed. Please explain the results to the caller "
+                        "in a clear and helpful way, and ask if they need anything else."
+                    )
+                }
             }
-        })
-        logger.info(f"🔗 MCP TOOL CALL: Response triggered for MCP result")
+            
+            logger.info(f"🔗 MCP TOOL CALL: Sending response message to model...")
+            logger.info(f"🔗 MCP TOOL CALL: Response message: {json.dumps(response_message, indent=2)}")
+            
+            await self.send_to_model(response_message)
+            logger.info(f"🔗 MCP TOOL CALL: Response triggered for MCP result")
+            
+        except Exception as e:
+            logger.error(f"🔗 MCP TOOL CALL: ===== MCP COMPLETION ERROR =====")
+            logger.error(f"🔗 MCP TOOL CALL: Error handling MCP completion: {e}")
+            logger.error(f"🔗 MCP TOOL CALL: Item ID: {item_id}")
+            logger.error(f"🔗 MCP TOOL CALL: Arguments: {arguments_json}")
+            logger.error(f"🔗 MCP TOOL CALL: Error Type: {type(e).__name__}")
+    
+    async def _send_mcp_error_feedback(self, item_id: str, failed_args: str, error_message: str, error_code: str) -> None:
+        """Send error feedback to the agent so it can learn from the mistake"""
+        logger.info(f"🔗 MCP TOOL CALL: ===== SENDING ERROR FEEDBACK =====")
+        logger.info(f"🔗 MCP TOOL CALL: Item ID: {item_id}")
+        logger.info(f"🔗 MCP TOOL CALL: Error Message: {error_message}")
+        logger.info(f"🔗 MCP TOOL CALL: Error Code: {error_code}")
+        
+        try:
+            # Parse the failed arguments to understand what went wrong
+            try:
+                parsed_args = json.loads(failed_args)
+                if isinstance(parsed_args, dict):
+                    if 'name' in parsed_args:
+                        tool_name = parsed_args.get('name', 'Unknown Tool')
+                        tool_params = parsed_args.get('arguments', {})
+                    else:
+                        tool_name = 'MCP Tool'
+                        tool_params = parsed_args
+                else:
+                    tool_name = 'MCP Tool'
+                    tool_params = {}
+            except json.JSONDecodeError:
+                tool_name = 'MCP Tool'
+                tool_params = {}
+            
+            # Create a detailed error message for the agent
+            error_feedback = f"""The MCP tool call failed with the following error:
+
+Error Code: {error_code}
+Error Message: {error_message}
+
+Tool Parameters Used:
+{json.dumps(tool_params, indent=2)}
+
+Please review the error and try again with corrected parameters. Common issues include:
+- Invalid timezone format (use standard timezone names like "America/New_York")
+- Invalid date format (use ISO format like "2025-09-23")
+- Missing required parameters
+- Invalid parameter values"""
+            
+            # Send the error feedback to the agent
+            error_response = {
+                "type": "response.create",
+                "response": {
+                    "modalities": ["audio", "text"],
+                    "instructions": (
+                        f"I encountered an error with the tool call. {error_message} "
+                        f"Please try again with corrected parameters. If this is a timezone issue, "
+                        f"use standard timezone names like 'America/New_York' or 'UTC'."
+                    )
+                }
+            }
+            
+            logger.info(f"🔗 MCP TOOL CALL: Sending error feedback to agent...")
+            logger.info(f"🔗 MCP TOOL CALL: Error feedback: {json.dumps(error_response, indent=2)}")
+            
+            await self.send_to_model(error_response)
+            logger.info(f"🔗 MCP TOOL CALL: Error feedback sent to agent")
+            
+        except Exception as e:
+            logger.error(f"🔗 MCP TOOL CALL: ===== ERROR FEEDBACK FAILED =====")
+            logger.error(f"🔗 MCP TOOL CALL: Error sending feedback: {e}")
+            logger.error(f"🔗 MCP TOOL CALL: Item ID: {item_id}")
+            logger.error(f"🔗 MCP TOOL CALL: Error Type: {type(e).__name__}")
 
     async def _handle_function_call_from_args(self, function_name: str, arguments_json: str, call_id: str) -> None:
         """Handle function call execution from streamed arguments (recommended approach)"""
         from .tools import execute_tool
         
-        logger.info(f"🔧 TOOL CALL: Executing {function_name}")
+        # Enhanced debug logging
+        logger.info(f"🔧 TOOL CALL: ===== STREAMED TOOL EXECUTION START =====")
+        logger.info(f"🔧 TOOL CALL: Function: {function_name}")
+        logger.info(f"🔧 TOOL CALL: Call ID: {call_id}")
+        logger.info(f"🔧 TOOL CALL: Arguments JSON: {arguments_json}")
+        logger.info(f"🔧 TOOL CALL: Timestamp: {datetime.now().isoformat()}")
 
         # Send a quick "holding" response without injecting an assistant message item
         await self.send_to_model({
@@ -764,20 +1093,40 @@ class RealtimeSession:
                 "instructions": "One moment while I check that for you..."
             }
         })
+        logger.info(f"🔧 TOOL CALL: Sent holding response to user")
 
         try:
-            # Parse arguments with error handling
+            # Parse arguments with enhanced error handling
             try:
                 args = json.loads(arguments_json or "{}")
+                logger.info(f"🔧 TOOL CALL: Parsed Arguments: {json.dumps(args, indent=2)}")
             except json.JSONDecodeError as e:
-                logger.warning(f"🔧 TOOL CALL: Invalid JSON arguments, using empty dict: {e}")
+                logger.error(f"🔧 TOOL CALL: JSON Parse Error: {e}")
+                logger.error(f"🔧 TOOL CALL: Invalid JSON: {arguments_json}")
                 args = {}
+                logger.warning(f"🔧 TOOL CALL: Using empty dict as fallback")
             
-            # Execute the tool
+            # Execute the tool with enhanced logging
+            logger.info(f"🔧 TOOL CALL: Starting tool execution...")
             result = await execute_tool(function_name, args)
-            logger.info(f"🔧 TOOL CALL: Tool completed - {function_name}")
+            
+            # Enhanced result logging
+            logger.info(f"🔧 TOOL CALL: ===== STREAMED TOOL EXECUTION COMPLETED =====")
+            logger.info(f"🔧 TOOL CALL: Function: {function_name}")
+            logger.info(f"🔧 TOOL CALL: Success: True")
+            if isinstance(result, dict):
+                logger.info(f"🔧 TOOL CALL: Result Type: Dict")
+                logger.info(f"🔧 TOOL CALL: Result Keys: {list(result.keys())}")
+                if 'error' in result:
+                    logger.error(f"🔧 TOOL CALL: Tool returned error: {result['error']}")
+                else:
+                    logger.info(f"🔧 TOOL CALL: Result: {json.dumps(result, indent=2)}")
+            else:
+                logger.info(f"🔧 TOOL CALL: Result Type: {type(result).__name__}")
+                logger.info(f"🔧 TOOL CALL: Result: {str(result)}")
 
             # Step 1: Attach tool result to conversation
+            logger.info(f"🔧 TOOL CALL: Attaching result to conversation...")
             await self.send_to_model({
                 "type": "conversation.item.create",
                 "item": {
@@ -786,8 +1135,10 @@ class RealtimeSession:
                     "output": json.dumps(result) if not isinstance(result, str) else result
                 }
             })
+            logger.info(f"🔧 TOOL CALL: Result attached to conversation")
 
             # Step 2: Explicitly ask the model to speak about it
+            logger.info(f"🔧 TOOL CALL: Triggering response generation...")
             await self.send_to_model({
                 "type": "response.create",
                 "response": {
@@ -798,10 +1149,45 @@ class RealtimeSession:
                     )
                 }
             })
-            logger.info(f"🔧 TOOL CALL: Response triggered for {function_name}")
+            logger.info(f"🔧 TOOL CALL: Response generation triggered for {function_name}")
 
         except Exception as e:
-            logger.error(f"🔧 TOOL CALL: Error executing {function_name}: {e}")
+            # Enhanced error logging
+            logger.error(f"🔧 TOOL CALL: ===== STREAMED TOOL EXECUTION FAILED =====")
+            logger.error(f"🔧 TOOL CALL: Function: {function_name}")
+            logger.error(f"🔧 TOOL CALL: Call ID: {call_id}")
+            logger.error(f"🔧 TOOL CALL: Error Type: {type(e).__name__}")
+            logger.error(f"🔧 TOOL CALL: Error Message: {str(e)}")
+            logger.error(f"🔧 TOOL CALL: Arguments JSON: {arguments_json}")
+            logger.error(f"🔧 TOOL CALL: Timestamp: {datetime.now().isoformat()}")
+            
+            # Send error result to model
+            error_result = {
+                "error": f"Tool execution failed: {str(e)}",
+                "function_name": function_name,
+                "call_id": call_id
+            }
+            
+            try:
+                await self.send_to_model({
+                    "type": "conversation.item.create",
+                    "item": {
+                        "type": "function_call_output",
+                        "call_id": call_id,
+                        "output": json.dumps(error_result)
+                    }
+                })
+                
+                await self.send_to_model({
+                    "type": "response.create",
+                    "response": {
+                        "modalities": ["audio", "text"],
+                        "instructions": "I encountered an error while processing your request. Please try again or ask something else."
+                    }
+                })
+                logger.info(f"🔧 TOOL CALL: Error response sent to user")
+            except Exception as response_error:
+                logger.error(f"🔧 TOOL CALL: Failed to send error response: {response_error}")
 
     async def handle_output_item_done(self, event: Dict[str, Any]) -> None:
         """Handle completed output items (fallback for non-function-call items)"""

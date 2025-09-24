@@ -285,9 +285,19 @@ class AgentConfigurationAdmin(admin.ModelAdmin):
 
 @admin.register(Conversation)
 class ConversationAdmin(admin.ModelAdmin):
-    list_display = ('id', 'call_session', 'started_at', 'ended_at', 'turn_count', 'event_count')
+    list_display = ('id', 'call_session', 'started_at', 'ended_at', 'turn_count', 'event_count', 'view_chat_history')
     list_filter = ('started_at', 'ended_at', 'call_session__agent_config')
-    readonly_fields = ('started_at', 'ended_at')
+    readonly_fields = ('started_at', 'ended_at', 'chat_history_link')
+    
+    fieldsets = (
+        ('Conversation Info', {
+            'fields': ('call_session', 'started_at', 'ended_at', 'metadata')
+        }),
+        ('Chat History', {
+            'fields': ('chat_history_link',),
+            'description': 'View the complete conversation history for this call session'
+        }),
+    )
     
     def turn_count(self, obj):
         return obj.turns.count()
@@ -296,17 +306,72 @@ class ConversationAdmin(admin.ModelAdmin):
     def event_count(self, obj):
         return obj.events.count()
     event_count.short_description = 'Events'
+    
+    def view_chat_history(self, obj):
+        """Display a link to view chat history"""
+        from django.urls import reverse
+        from django.utils.html import format_html
+        
+        if obj.call_session and obj.call_session.session_id:
+            url = reverse('chat_history', args=[obj.call_session.session_id])
+            return format_html(
+                '<a href="{}" target="_blank" style="background: #4f46e5; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: 600;">📞 View Chat History</a>',
+                url
+            )
+        return "No session"
+    view_chat_history.short_description = 'Chat History'
+    view_chat_history.allow_tags = True
+    
+    def chat_history_link(self, obj):
+        """Display chat history link in detail view"""
+        return self.view_chat_history(obj)
+    chat_history_link.short_description = 'Chat History Link'
+    chat_history_link.allow_tags = True
 
 
 @admin.register(Turn)
 class TurnAdmin(admin.ModelAdmin):
-    list_display = ('id', 'conversation', 'role', 'text_preview', 'started_at', 'completed_at')
+    list_display = ('id', 'conversation', 'role', 'text_preview', 'started_at', 'completed_at', 'view_chat_history')
     list_filter = ('role', 'started_at', 'conversation__call_session__agent_config')
-    readonly_fields = ('started_at', 'completed_at')
+    readonly_fields = ('started_at', 'completed_at', 'chat_history_link')
+    
+    fieldsets = (
+        ('Turn Info', {
+            'fields': ('conversation', 'role', 'text', 'audio_url', 'meta')
+        }),
+        ('Timing', {
+            'fields': ('started_at', 'completed_at')
+        }),
+        ('Chat History', {
+            'fields': ('chat_history_link',),
+            'description': 'View the complete conversation history for this call session'
+        }),
+    )
     
     def text_preview(self, obj):
         return obj.text[:100] + "..." if len(obj.text) > 100 else obj.text
     text_preview.short_description = 'Message'
+    
+    def view_chat_history(self, obj):
+        """Display a link to view chat history"""
+        from django.urls import reverse
+        from django.utils.html import format_html
+        
+        if obj.conversation and obj.conversation.call_session and obj.conversation.call_session.session_id:
+            url = reverse('chat_history', args=[obj.conversation.call_session.session_id])
+            return format_html(
+                '<a href="{}" target="_blank" style="background: #4f46e5; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: 600;">📞 View Chat History</a>',
+                url
+            )
+        return "No session"
+    view_chat_history.short_description = 'Chat History'
+    view_chat_history.allow_tags = True
+    
+    def chat_history_link(self, obj):
+        """Display chat history link in detail view"""
+        return self.view_chat_history(obj)
+    chat_history_link.short_description = 'Chat History Link'
+    chat_history_link.allow_tags = True
 
 
 @admin.register(Event)
@@ -322,10 +387,10 @@ class EventAdmin(admin.ModelAdmin):
 
 @admin.register(CallSession)
 class CallSessionAdmin(admin.ModelAdmin):
-    list_display = ('session_id', 'caller_number', 'called_number', 'phone_number', 'status', 'agent_config', 'call_start_time', 'call_duration_seconds')
+    list_display = ('session_id', 'caller_number', 'called_number', 'phone_number', 'status', 'agent_config', 'call_start_time', 'call_duration_seconds', 'view_chat_history')
     list_filter = ('status', 'phone_number__user', 'agent_config', 'call_start_time')
     search_fields = ('session_id', 'twilio_call_sid', 'caller_number', 'called_number')
-    readonly_fields = ('session_id', 'call_start_time', 'call_end_time', 'call_duration_seconds')
+    readonly_fields = ('session_id', 'call_start_time', 'call_end_time', 'call_duration_seconds', 'chat_history_link')
     
     fieldsets = (
         ('Session Info', {
@@ -336,6 +401,10 @@ class CallSessionAdmin(admin.ModelAdmin):
         }),
         ('Call Timing', {
             'fields': ('call_start_time', 'call_end_time', 'call_duration_seconds')
+        }),
+        ('Chat History', {
+            'fields': ('chat_history_link',),
+            'description': 'View the complete conversation history for this call session'
         }),
         ('Conversation Log', {
             'fields': ('conversation_log',),
@@ -349,3 +418,24 @@ class CallSessionAdmin(admin.ModelAdmin):
         if request.user.is_superuser:
             return qs
         return qs.filter(phone_number__user=request.user)
+    
+    def view_chat_history(self, obj):
+        """Display a link to view chat history"""
+        from django.urls import reverse
+        from django.utils.html import format_html
+        
+        if obj.session_id:
+            url = reverse('chat_history', args=[obj.session_id])
+            return format_html(
+                '<a href="{}" target="_blank" style="background: #4f46e5; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: 600;">📞 View Chat History</a>',
+                url
+            )
+        return "No session ID"
+    view_chat_history.short_description = 'Chat History'
+    view_chat_history.allow_tags = True
+    
+    def chat_history_link(self, obj):
+        """Display chat history link in detail view"""
+        return self.view_chat_history(obj)
+    chat_history_link.short_description = 'Chat History Link'
+    chat_history_link.allow_tags = True
