@@ -604,7 +604,7 @@ class RealtimeSession:
     
     async def send_delayed_greeting(self) -> None:
         """Send greeting after a small delay to ensure session is fully ready"""
-        await asyncio.sleep(0.5)  # Wait 0.5 seconds for session to be fully established
+        await asyncio.sleep(1.0)  # Wait 1.0 seconds for session to be fully established
         await self.send_initial_greeting()
     
     async def send_initial_greeting(self) -> None:
