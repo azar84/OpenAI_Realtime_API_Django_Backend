@@ -623,6 +623,76 @@ class RealtimeSession:
             # Get agent timezone for initial message
             agent_timezone = getattr(self.agent_config, 'agent_timezone', 'UTC') if self.agent_config else 'UTC'
             
+            # Get call information from the call session
+            call_direction = "incoming"
+            call_sid = ""
+            caller_number = ""
+            called_number = ""
+            
+            if hasattr(self, 'call_session') and self.call_session:
+                call_sid = self.call_session.twilio_call_sid or ""
+                caller_number = self.call_session.caller_number or ""
+                called_number = self.call_session.called_number or ""
+                
+                # Determine call direction based on phone number ownership
+                call_direction = "incoming"  # Default assumption
+                
+                if self.call_session.phone_number:
+                    # If the called number matches our phone number, it's incoming
+                    if self.call_session.phone_number.phone_number == called_number:
+                        call_direction = "incoming"
+                    else:
+                        call_direction = "outgoing"
+                else:
+                    # If no phone_number is set, try to determine from our agent's phone numbers
+                    if self.agent_config and hasattr(self.agent_config, 'user'):
+                        from .models import PhoneNumber
+                        try:
+                            # Check if caller_number belongs to our user (outgoing call)
+                            user_phone = PhoneNumber.objects.filter(
+                                phone_number=caller_number,
+                                user=self.agent_config.user,
+                                is_active=True
+                            ).first()
+                            if user_phone:
+                                call_direction = "outgoing"
+                            else:
+                                # Check if called_number belongs to our user (incoming call)
+                                user_phone = PhoneNumber.objects.filter(
+                                    phone_number=called_number,
+                                    user=self.agent_config.user,
+                                    is_active=True
+                                ).first()
+                                if user_phone:
+                                    call_direction = "incoming"
+                        except Exception as e:
+                            logger.debug(f"Could not determine call direction: {e}")
+                            # Keep default "incoming"
+            
+            # Get welcoming message from agent configuration
+            welcoming_message = ""
+            if self.agent_config and hasattr(self.agent_config, 'instructions') and self.agent_config.instructions:
+                # Extract welcoming message from instructions if available
+                instructions = self.agent_config.instructions
+                if "welcoming message" in instructions.lower() or "greeting" in instructions.lower():
+                    # Try to extract the welcoming message from instructions
+                    lines = instructions.split('\n')
+                    for line in lines:
+                        if 'welcoming' in line.lower() or 'greeting' in line.lower():
+                            welcoming_message = line.strip()
+                            break
+            
+            # Create the enhanced greeting prompt
+            if call_direction == "incoming":
+                target_number = caller_number
+                greeting_text = f"""You have an {call_direction} call from {target_number}. Call SID is "{call_sid}". You are operating in the {agent_timezone} timezone. Start using the welcoming message assigned to you."""
+            else:
+                target_number = called_number
+                greeting_text = f"""You have an {call_direction} call to {target_number}. Call SID is "{call_sid}". You are operating in the {agent_timezone} timezone. Start using the welcoming message assigned to you."""
+            
+            if welcoming_message:
+                greeting_text += f"\n\nYour welcoming message: {welcoming_message}"
+            
             # Create an initial conversation item to trigger the greeting
             greeting_prompt = {
                 "type": "conversation.item.create",
@@ -632,7 +702,7 @@ class RealtimeSession:
                     "content": [
                         {
                             "type": "input_text",
-                            "text": f"Hello {agent_name}, the call has just connected. You are operating in the {agent_timezone} timezone. Please greet the caller and start the conversation according to your instructions."
+                            "text": greeting_text
                         }
                     ]
                 }
@@ -658,6 +728,8 @@ class RealtimeSession:
     async def initialize_conversation_tracking(self, call_session) -> None:
         """Initialize conversation tracking for this session"""
         try:
+            # Store the call session for use in greeting
+            self.call_session = call_session
             self.conversation = await conversation_tracker.get_or_create_conversation(call_session)
             logger.info(f"📝 Conversation tracking initialized for session {self.session_id[:8]}...")
         except Exception as e:

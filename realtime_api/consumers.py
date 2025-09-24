@@ -115,22 +115,45 @@ class RealtimeConsumer(AsyncWebsocketConsumer):
                 except (PhoneNumber.DoesNotExist, ValueError):
                     logger.warning(f"Phone number ID {phone_id} not found or inactive")
             
-            # NEW: Try to lookup by session's call data
+            # NEW: Try to lookup by session's call data (both incoming and outgoing calls)
             try:
                 call_session = CallSession.objects.get(session_id=self.session_id)
+                from .models import PhoneNumber
+                
+                # First, try to find agent by called_number (incoming calls)
                 if call_session.called_number:
-                    from .models import PhoneNumber
-                    phone_number = PhoneNumber.objects.select_related('user', 'agent_config__user').get(
-                        phone_number=call_session.called_number,
-                        is_active=True
-                    )
-                    agent = phone_number.get_agent_config()
-                    if agent:
-                        # Test the API key right here
-                        test_api_key = agent.get_user_api_key()
-                        logger.info(f"🔑 CONSUMER: Agent {agent.name} API key: {test_api_key[:20]}...")
-                        logger.info(f"Using session-routed agent: {agent.name} for {phone_number.phone_number}")
-                        return agent
+                    try:
+                        phone_number = PhoneNumber.objects.select_related('user', 'agent_config__user').get(
+                            phone_number=call_session.called_number,
+                            is_active=True
+                        )
+                        agent = phone_number.get_agent_config()
+                        if agent:
+                            test_api_key = agent.get_user_api_key()
+                            logger.info(f"🔑 CONSUMER: Agent {agent.name} API key: {test_api_key[:20]}...")
+                            logger.info(f"Using session-routed agent (incoming): {agent.name} for {phone_number.phone_number}")
+                            return agent
+                    except PhoneNumber.DoesNotExist:
+                        logger.debug(f"No phone number found for called_number: {call_session.called_number}")
+                
+                # If not found by called_number, try caller_number (outgoing calls)
+                if call_session.caller_number:
+                    try:
+                        phone_number = PhoneNumber.objects.select_related('user', 'agent_config__user').get(
+                            phone_number=call_session.caller_number,
+                            is_active=True
+                        )
+                        agent = phone_number.get_agent_config()
+                        if agent:
+                            test_api_key = agent.get_user_api_key()
+                            logger.info(f"🔑 CONSUMER: Agent {agent.name} API key: {test_api_key[:20]}...")
+                            logger.info(f"Using session-routed agent (outgoing): {agent.name} for {phone_number.phone_number}")
+                            return agent
+                    except PhoneNumber.DoesNotExist:
+                        logger.debug(f"No phone number found for caller_number: {call_session.caller_number}")
+                
+                logger.debug(f"Could not find agent for call session: caller={call_session.caller_number}, called={call_session.called_number}")
+                
             except Exception as e:
                 logger.debug(f"Could not route by session data: {e}")
             
