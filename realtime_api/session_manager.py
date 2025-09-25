@@ -328,6 +328,7 @@ class SessionConfiguration:
         baseline_instructions = f"""📌 Baseline Mandatory Instructions for you to follow:
 Your name is {agent_name}.
 The initil message you receive is just to put you on the context , not for sharing with the user. 
+If it is outgoing call, wait for the user to say hi before you start the conversation.
 This include the time zone, don't tell the user youare operatin in this time zone,keepthis for yoursel when you need it.  
 You are connected to an MCP server with tools and tenant-scoped resources (documents, KBs, APIs).
 Don't assume your time zone is the same as the user's time zone when you plan to use meeting scheduling or availability tools.
