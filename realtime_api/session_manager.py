@@ -319,8 +319,14 @@ class SessionConfiguration:
     
     def _add_tool_instructions(self, config: Dict[str, Any], agent_timezone: str = "UTC") -> None:
         """Add tool handling instructions to session config"""
+        # Get agent name for personalized instructions
+        agent_name = "Assistant"
+        if self.agent_config and self.agent_config.name:
+            agent_name = self.agent_config.name
+        
         # Baseline mandatory instructions for all voice agents
         baseline_instructions = f"""📌 Baseline Mandatory Instructions for you to follow:
+Your name is {agent_name}.
 The initil message you receive is just to put you on the context , not for sharing with the user. 
 This include the time zone, don't tell the user youare operatin in this time zone,keepthis for yoursel when you need it.  
 You are connected to an MCP server with tools and tenant-scoped resources (documents, KBs, APIs).
