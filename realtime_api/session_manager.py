@@ -287,12 +287,14 @@ class SessionConfiguration:
         self.call_direction = "incoming"
         self.caller_number = ""
         self.called_number = ""
+        self.call_sid = ""
     
-    def set_call_info(self, call_direction: str, caller_number: str, called_number: str) -> None:
+    def set_call_info(self, call_direction: str, caller_number: str, called_number: str, call_sid: str = "") -> None:
         """Set call information for session configuration"""
         self.call_direction = call_direction
         self.caller_number = caller_number
         self.called_number = called_number
+        self.call_sid = call_sid
     
     def get_session_config(self) -> Dict[str, Any]:
         """Get complete session configuration"""
@@ -310,7 +312,7 @@ class SessionConfiguration:
         
         # Add tool handling instructions with agent timezone and call information
         agent_timezone = getattr(self.agent_config, 'agent_timezone', 'UTC') if self.agent_config else 'UTC'
-        self._add_tool_instructions(config, agent_timezone, self.call_direction, self.caller_number, self.called_number)
+        self._add_tool_instructions(config, agent_timezone, self.call_direction, self.caller_number, self.called_number, self.call_sid)
         
         # Ensure tool_choice is set to auto
         config["tool_choice"] = "auto"
@@ -326,7 +328,7 @@ class SessionConfiguration:
             "input_audio_transcription": {"model": "whisper-1"},
         }
     
-    def _add_tool_instructions(self, config: Dict[str, Any], agent_timezone: str = "UTC", call_direction: str = "incoming", caller_number: str = "", called_number: str = "") -> None:
+    def _add_tool_instructions(self, config: Dict[str, Any], agent_timezone: str = "UTC", call_direction: str = "incoming", caller_number: str = "", called_number: str = "", call_sid: str = "") -> None:
         """Add tool handling instructions to session config"""
         # Get agent name for personalized instructions
         agent_name = "Assistant"
@@ -338,10 +340,16 @@ class SessionConfiguration:
         if call_direction == "outgoing" and caller_number and called_number:
             outgoing_call_instruction = f"You are calling {called_number} from {caller_number}."
         
+        # Add call SID information
+        call_sid_instruction = ""
+        if call_sid:
+            call_sid_instruction = f"Call SID: {call_sid}."
+        
         # Baseline mandatory instructions for all voice agents
         baseline_instructions = f"""📌 Baseline Mandatory Instructions for you to follow:
 Your name is {agent_name}.
 {outgoing_call_instruction}
+the call_sid is :{call_sid_instruction}
 The initil message you receive is just to put you on the context , not for sharing with the user. 
 If it is outgoing call, wait for the user to say hi before you start the conversation.
 This include the time zone, don't tell the user youare operatin in this time zone,keepthis for yoursel when you need it.  
@@ -541,10 +549,12 @@ class RealtimeSession:
             call_direction = "incoming"
             caller_number = ""
             called_number = ""
+            call_sid = ""
             
             if hasattr(self, 'call_session') and self.call_session:
                 caller_number = self.call_session.caller_number or ""
                 called_number = self.call_session.called_number or ""
+                call_sid = self.call_session.twilio_call_sid or ""
                 
                 # Determine call direction based on phone number ownership
                 if self.call_session.phone_number:
@@ -564,8 +574,8 @@ class RealtimeSession:
                             # Keep default "incoming"
             
             # Set call information in session configuration
-            self.config_handler.set_call_info(call_direction, caller_number, called_number)
-            logger.info(f"📞 Set call info: {call_direction} call from {caller_number} to {called_number}")
+            self.config_handler.set_call_info(call_direction, caller_number, called_number, call_sid)
+            logger.info(f"📞 Set call info: {call_direction} call from {caller_number} to {called_number}, SID: {call_sid}")
             
         except Exception as e:
             logger.error(f"Error setting call info for config: {e}")
