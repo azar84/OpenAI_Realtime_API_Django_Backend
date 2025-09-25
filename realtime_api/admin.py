@@ -175,7 +175,7 @@ class AgentConfigurationAdmin(admin.ModelAdmin):
         }),
         ('MCP Server Integration', {
             'fields': ('mcp_tenant_id', 'mcp_auth_token'),
-            'description': 'Configure Model Context Protocol (MCP) server connection for enhanced capabilities',
+            'description': 'Configure Model Context Protocol (MCP) server connection for enhanced capabilities. Leave auth token blank to keep existing value.',
             'classes': ('collapse',)
         }),
         ('Agent Settings', {
@@ -203,9 +203,21 @@ class AgentConfigurationAdmin(admin.ModelAdmin):
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
     
     def save_model(self, request, obj, form, change):
-        """Automatically set user for new agents if not superuser"""
+        """Automatically set user for new agents if not superuser and preserve MCP token"""
         if not change and not request.user.is_superuser:
             obj.user = request.user
+        
+        # Preserve MCP auth token if it's not being changed
+        if change and hasattr(obj, 'mcp_auth_token'):
+            # Get the original object from database
+            try:
+                original_obj = AgentConfiguration.objects.get(pk=obj.pk)
+                # If the form field is empty (password field behavior), keep the original value
+                if not form.cleaned_data.get('mcp_auth_token') and original_obj.mcp_auth_token:
+                    obj.mcp_auth_token = original_obj.mcp_auth_token
+            except AgentConfiguration.DoesNotExist:
+                pass  # New object, no need to preserve
+        
         super().save_model(request, obj, form, change)
     
     def formfield_for_dbfield(self, db_field, request, **kwargs):
@@ -262,7 +274,7 @@ class AgentConfigurationAdmin(admin.ModelAdmin):
         elif db_field.name == "mcp_auth_token":
             # MCP Auth Token as password field for security
             kwargs["widget"] = forms.PasswordInput(attrs={
-                'placeholder': 'MCP server authentication token (optional)',
+                'placeholder': 'Enter new token or leave blank to keep existing',
                 'size': '50',
                 'render_value': True  # Show existing value when editing
             })
