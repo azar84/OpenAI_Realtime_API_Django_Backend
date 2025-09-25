@@ -284,6 +284,15 @@ class SessionConfiguration:
     def __init__(self, agent_config):
         self.agent_config = agent_config
         self.logger = logging.getLogger(f"{__name__}.SessionConfiguration")
+        self.call_direction = "incoming"
+        self.caller_number = ""
+        self.called_number = ""
+    
+    def set_call_info(self, call_direction: str, caller_number: str, called_number: str) -> None:
+        """Set call information for session configuration"""
+        self.call_direction = call_direction
+        self.caller_number = caller_number
+        self.called_number = called_number
     
     def get_session_config(self) -> Dict[str, Any]:
         """Get complete session configuration"""
@@ -299,9 +308,9 @@ class SessionConfiguration:
         config["input_audio_format"] = "g711_ulaw"
         config["output_audio_format"] = "g711_ulaw"
         
-        # Add tool handling instructions with agent timezone
+        # Add tool handling instructions with agent timezone and call information
         agent_timezone = getattr(self.agent_config, 'agent_timezone', 'UTC') if self.agent_config else 'UTC'
-        self._add_tool_instructions(config, agent_timezone)
+        self._add_tool_instructions(config, agent_timezone, self.call_direction, self.caller_number, self.called_number)
         
         # Ensure tool_choice is set to auto
         config["tool_choice"] = "auto"
@@ -317,16 +326,22 @@ class SessionConfiguration:
             "input_audio_transcription": {"model": "whisper-1"},
         }
     
-    def _add_tool_instructions(self, config: Dict[str, Any], agent_timezone: str = "UTC") -> None:
+    def _add_tool_instructions(self, config: Dict[str, Any], agent_timezone: str = "UTC", call_direction: str = "incoming", caller_number: str = "", called_number: str = "") -> None:
         """Add tool handling instructions to session config"""
         # Get agent name for personalized instructions
         agent_name = "Assistant"
         if self.agent_config and self.agent_config.name:
             agent_name = self.agent_config.name
         
+        # Add outgoing call specific instructions
+        outgoing_call_instruction = ""
+        if call_direction == "outgoing" and caller_number and called_number:
+            outgoing_call_instruction = f"You are calling {called_number} from {caller_number}."
+        
         # Baseline mandatory instructions for all voice agents
         baseline_instructions = f"""📌 Baseline Mandatory Instructions for you to follow:
 Your name is {agent_name}.
+{outgoing_call_instruction}
 The initil message you receive is just to put you on the context , not for sharing with the user. 
 If it is outgoing call, wait for the user to say hi before you start the conversation.
 This include the time zone, don't tell the user youare operatin in this time zone,keepthis for yoursel when you need it.  
@@ -488,6 +503,9 @@ class RealtimeSession:
         
         logger.info(f"Stream started: {self.stream_sid}")
         
+        # Set call information in session configuration
+        await self._set_call_info_for_config()
+        
         # Use MCP-enabled connection if agent has MCP integration
         if self.agent_config and self.agent_config.has_mcp_integration():
             logger.info(f"🔗 Using MCP-enabled connection for agent {self.agent_config.name}")
@@ -516,6 +534,41 @@ class RealtimeSession:
         """Handle Twilio stream stop event"""
         logger.info(f"Stream stopped: {self.stream_sid}")
         await self.cleanup_all_connections()
+    
+    async def _set_call_info_for_config(self) -> None:
+        """Set call information in session configuration"""
+        try:
+            call_direction = "incoming"
+            caller_number = ""
+            called_number = ""
+            
+            if hasattr(self, 'call_session') and self.call_session:
+                caller_number = self.call_session.caller_number or ""
+                called_number = self.call_session.called_number or ""
+                
+                # Determine call direction based on phone number ownership
+                if self.call_session.phone_number:
+                    # If the called number matches our phone number, it's incoming
+                    if self.call_session.phone_number.phone_number == called_number:
+                        call_direction = "incoming"
+                    else:
+                        call_direction = "outgoing"
+                else:
+                    # If no phone_number is set, try to determine from our agent's phone numbers
+                    if self.agent_config and hasattr(self.agent_config, 'user'):
+                        try:
+                            # Use async database query to determine call direction
+                            call_direction = await self._determine_call_direction_async(caller_number, called_number)
+                        except Exception as e:
+                            logger.debug(f"Could not determine call direction: {e}")
+                            # Keep default "incoming"
+            
+            # Set call information in session configuration
+            self.config_handler.set_call_info(call_direction, caller_number, called_number)
+            logger.info(f"📞 Set call info: {call_direction} call from {caller_number} to {called_number}")
+            
+        except Exception as e:
+            logger.error(f"Error setting call info for config: {e}")
     
     async def try_connect_model_with_mcp(self) -> None:
         """Connect to OpenAI Realtime API using official client with MCP support"""
@@ -690,13 +743,14 @@ class RealtimeSession:
                             welcoming_message = line.strip()
                             break
             
-            # Create the enhanced greeting prompt
-            if call_direction == "incoming":
-                target_number = caller_number
-                greeting_text = f"""You have an {call_direction} call from {target_number}. Call SID is "{call_sid}". You are operating in the {agent_timezone} timezone. Start using the welcoming message assigned to you."""
-            else:
-                target_number = called_number
-                greeting_text = f"""You have an {call_direction} call to {target_number}. Call SID is "{call_sid}". You are operating in the {agent_timezone} timezone. Start using the welcoming message assigned to you."""
+            # Skip greeting message for outgoing calls
+            if call_direction == "outgoing":
+                logger.info(f"🎤 Skipping initial greeting for outgoing call to {called_number}")
+                return
+            
+            # Create the enhanced greeting prompt for incoming calls only
+            target_number = caller_number
+            greeting_text = f"""You have an {call_direction} call from {target_number}. Call SID is "{call_sid}". You are operating in the {agent_timezone} timezone. Start using the welcoming message assigned to you."""
             
             if welcoming_message:
                 greeting_text += f"\n\nYour welcoming message: {welcoming_message}"
