@@ -175,7 +175,7 @@ class AgentConfigurationAdmin(admin.ModelAdmin):
         }),
         ('MCP Server Integration', {
             'fields': ('mcp_tenant_id', 'mcp_auth_token'),
-            'description': 'Configure Model Context Protocol (MCP) server connection for enhanced capabilities. Leave auth token blank to keep existing value.',
+            'description': 'Configure Model Context Protocol (MCP) server connection for enhanced capabilities. When editing, leave auth token blank to keep existing value, or enter a new token to replace it.',
             'classes': ('collapse',)
         }),
         ('Agent Settings', {
@@ -212,9 +212,16 @@ class AgentConfigurationAdmin(admin.ModelAdmin):
             # Get the original object from database
             try:
                 original_obj = AgentConfiguration.objects.get(pk=obj.pk)
-                # If the form field is empty (password field behavior), keep the original value
-                if not form.cleaned_data.get('mcp_auth_token') and original_obj.mcp_auth_token:
+                # Check the form data for MCP token
+                form_mcp_token = form.cleaned_data.get('mcp_auth_token', '') or ''
+                
+                # If the form field is empty or just whitespace, preserve the original token
+                if not form_mcp_token.strip() and original_obj.mcp_auth_token:
                     obj.mcp_auth_token = original_obj.mcp_auth_token
+                    # Log that we're preserving the existing token
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.info(f"Preserving existing MCP token for AgentConfiguration ID {obj.pk}")
             except AgentConfiguration.DoesNotExist:
                 pass  # New object, no need to preserve
         
@@ -272,11 +279,11 @@ class AgentConfigurationAdmin(admin.ModelAdmin):
                 'size': '40'
             })
         elif db_field.name == "mcp_auth_token":
-            # MCP Auth Token as password field for security
+            # MCP Auth Token as password field for security with better UX
             kwargs["widget"] = forms.PasswordInput(attrs={
                 'placeholder': 'Enter new token or leave blank to keep existing',
                 'size': '50',
-                'render_value': True  # Show existing value when editing
+                'render_value': False  # Never render the actual value for security
             })
         elif db_field.name == "agent_timezone":
             # Timezone field with helpful placeholder and common timezones
@@ -287,6 +294,20 @@ class AgentConfigurationAdmin(admin.ModelAdmin):
             })
         
         return super().formfield_for_dbfield(db_field, request, **kwargs)
+    
+    def get_form(self, request, obj=None, **kwargs):
+        """Customize form for better MCP token handling"""
+        form = super().get_form(request, obj, **kwargs)
+        
+        # For MCP auth token, add better help text when editing an existing object
+        if obj and hasattr(obj, 'mcp_auth_token') and obj.mcp_auth_token:
+            # Customize the form field help text for the MCP token
+            form.base_fields['mcp_auth_token'].help_text = "A token is currently stored (displayed masked). Leave blank to keep existing token, or enter a new token to replace it."
+        elif not obj:
+            # For new objects
+            form.base_fields['mcp_auth_token'].help_text = "Enter MCP authentication token"
+        
+        return form
     
     class Media:
         """Add custom CSS and JavaScript for enhanced admin interface"""
