@@ -186,16 +186,16 @@ class AgentConfiguration(models.Model):
     
     # Server VAD settings (used when vad_type = 'server_vad')
     vad_threshold = models.FloatField(
-        default=0.5,
-        help_text="Activation threshold (0-1). Higher = requires louder audio, better for noisy environments"
+        default=0.7,
+        help_text="Activation threshold (0.0=sensitive, 1.0=requires loud audio). Higher = requires louder audio, better for noisy environments. Recommended: 0.7"
     )
     vad_prefix_padding_ms = models.IntegerField(
         default=300,
-        help_text="Audio to include before detected speech (milliseconds)"
+        help_text="Audio to include before detected speech (milliseconds). Higher = captures more context at speech start"
     )
     vad_silence_duration_ms = models.IntegerField(
         default=500,
-        help_text="Silence duration to detect speech stop (milliseconds). Shorter = faster turn detection"
+        help_text="Silence duration to detect speech stop (milliseconds). Shorter = faster turn detection, larger = more stable in noisy environments"
     )
     
     # Semantic VAD settings (used when vad_type = 'semantic_vad')

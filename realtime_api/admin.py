@@ -168,7 +168,14 @@ class AgentConfigurationAdmin(admin.ModelAdmin):
         }),
         ('Voice Activity Detection', {
             'fields': ('vad_type', 'vad_threshold', 'vad_prefix_padding_ms', 'vad_silence_duration_ms', 'vad_eagerness'),
-            'description': 'Configure how the AI detects when you start/stop speaking'
+            'description': '''Configure how the AI detects when you start/stop speaking. 
+            
+Server VAD Options:
+• VAD Threshold: 0.7 (recommended) for moderate sensitivity, higher = requires louder audio (good for noisy environments)
+• VAD Prefix Padding: Audio captured before speech detected (300ms recommended)  
+• VAD Silence Duration: Time before considering speech finished (500ms recommended, shorter = faster detection)
+
+Semantic VAD (Context-based): Uses AI understanding of conversation context rather than audio volume.'''
         }),
         ('Transcription', {
             'fields': ('enable_input_transcription', 'transcription_model')
@@ -241,7 +248,7 @@ class AgentConfigurationAdmin(admin.ModelAdmin):
                 'data-suffix': ' (0.6=focused, 1.2=creative)'
             })
         elif db_field.name == "vad_threshold":
-            # VAD threshold slider with value display
+            # VAD threshold slider with enhanced value display
             kwargs["widget"] = forms.NumberInput(attrs={
                 'type': 'range',
                 'step': '0.1',
@@ -249,15 +256,25 @@ class AgentConfigurationAdmin(admin.ModelAdmin):
                 'max': '1.0',
                 'class': 'vad-slider slider-with-value',
                 'oninput': 'updateSliderValue(this)',
-                'data-suffix': ' (0.0=sensitive, 1.0=requires loud audio)'
+                'data-suffix': ' (0.0=sensitive, 0.7=recommended, 1.0=loud audio required)'
+            })
+        elif db_field.name == "vad_prefix_padding_ms":
+            # VAD prefix padding with enhanced guidance
+            kwargs["widget"] = forms.NumberInput(attrs={
+                'step': '50',
+                'min': '50',
+                'max': '2000',
+                'placeholder': '300ms (recommended)',
+                'title': 'Audio captured before detected speech (0-2000ms)'
             })
         elif db_field.name == "vad_silence_duration_ms":
-            # Silence duration with validation
+            # VAD silence duration with enhanced guidance
             kwargs["widget"] = forms.NumberInput(attrs={
                 'step': '100',
                 'min': '200',
                 'max': '2000',
-                'placeholder': '500ms (recommended)'
+                'placeholder': '500ms (recommended)',
+                'title': 'Silence duration to confirm speech end (200-2000ms)'
             })
         elif db_field.name == "max_response_output_tokens":
             # Max tokens with helpful placeholder
